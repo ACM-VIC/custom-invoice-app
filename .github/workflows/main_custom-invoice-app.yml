@@ -33,7 +33,7 @@ jobs:
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
-          name: node-appgit
+          name: node-app
           path: ./backend
 
   deploy:
