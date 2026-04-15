@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #fff;
+      line-height: 1.5;
+    }
+
+    /* ── Page layout ── */
+    .page { padding: 0; }
+
+    /* ── Header ── */
+    .header {
+      background: #1a1a1a;
+      color: #fff;
+      padding: 28px 32px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .store-name { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+    .store-meta { font-size: 11px; opacity: .7; margin-top: 4px; line-height: 1.6; }
+    .invoice-title { text-align: right; }
+    .invoice-title h1 { font-size: 26px; font-weight: 300; letter-spacing: 2px; text-transform: uppercase; }
+    .invoice-title .inv-num { font-size: 14px; font-weight: 700; margin-top: 4px; }
+    .invoice-title .inv-date { font-size: 11px; opacity: .7; margin-top: 2px; }
+
+    /* ── Billing type badge ── */
+    .billing-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+    .badge-ndis     { background: #e8f0fe; color: #1a56db; }
+    .badge-agedcare { background: #e6f4ea; color: #166534; }
+
+    /* ── Body sections ── */
+    .body { padding: 24px 32px; }
+
+    /* ── Info grid ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .info-box {
+      background: #f8f8f8;
+      border-radius: 6px;
+      padding: 14px 16px;
+    }
+    .info-box h3 {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+    .info-box p { font-size: 13px; color: #1a1a1a; line-height: 1.6; }
+    .info-box p strong { font-weight: 600; }
+
+    /* ── NDIS / Aged Care specific box ── */
+    .billing-detail {
+      border: 1.5px solid #1a1a1a;
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-bottom: 24px;
+    }
+    .billing-detail h3 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+    .billing-detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .billing-field label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #888;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .billing-field span { font-size: 13px; font-weight: 600; color: #1a1a1a; }
+
+    /* ── Line items table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0;
+    }
+    thead tr { background: #1a1a1a; color: #fff; }
+    thead th {
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+    thead th.right { text-align: right; }
+    tbody tr { border-bottom: 1px solid #f0f0f0; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 11px 12px;
+      font-size: 13px;
+      vertical-align: top;
+    }
+    tbody td.right { text-align: right; }
+    .item-title { font-weight: 600; }
+    .item-variant { font-size: 11px; color: #777; margin-top: 1px; }
+    .item-sku { font-size: 11px; color: #aaa; }
+
+    /* ── Totals ── */
+    .totals-wrap {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0;
+    }
+    .totals-table { width: 260px; }
+    .totals-table td { padding: 5px 12px; font-size: 13px; }
+    .totals-table td.label { color: #666; }
+    .totals-table td.value { text-align: right; font-weight: 600; }
+    .totals-table tr.total-row { border-top: 2px solid #1a1a1a; }
+    .totals-table tr.total-row td {
+      padding-top: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .gst-note {
+      font-size: 11px;
+      color: #888;
+      text-align: right;
+      margin-top: 4px;
+      padding-right: 12px;
+    }
+
+    /* ── Notes ── */
+    .notes-section { margin-top: 24px; padding: 14px 16px; background: #fffbe6; border-radius: 6px; border-left: 3px solid #f0c040; }
+    .notes-section h3 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: #888; margin-bottom: 6px; }
+    .notes-section p { font-size: 12px; color: #555; }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 32px;
+      padding: 18px 32px;
+      background: #f8f8f8;
+      border-top: 1px solid #e5e5e5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #888;
+    }
+    .footer strong { color: #555; }
+    .payment-terms {
+      margin-top: 16px;
+      padding: 0 32px;
+      font-size: 11px;
+      color: #aaa;
+      text-align: center;
+    }
+
+    /* ── Table wrapper with border ── */
+    .table-wrapper {
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="store-name">{{storeName}}</div>
+      <div class="store-meta">
+        {{#if storeAddress}}{{storeAddress}}<br>{{/if}}
+        {{#if storePhone}}Phone: {{storePhone}}<br>{{/if}}
+        {{storeEmail}}<br>
+        ABN: {{storeAbn}}
+      </div>
+      {{#if isNdis}}<span class="billing-badge badge-ndis">NDIS Invoice</span>{{/if}}
+      {{#if isAgedCare}}<span class="billing-badge badge-agedcare">Aged Care Invoice</span>{{/if}}
+    </div>
+    <div class="invoice-title">
+      <h1>Tax Invoice</h1>
+      <div class="inv-num">{{invoiceNumber}}</div>
+      <div class="inv-date">Issued: {{invoiceDate}}</div>
+      <div class="inv-date">Due: {{dueDate}}</div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- Bill to / Deliver to grid -->
+    <div class="info-grid">
+      <div class="info-box">
+        <h3>Bill To</h3>
+        <p>
+          <strong>{{customerName}}</strong><br>
+          {{customerEmail}}
+        </p>
+      </div>
+      <div class="info-box">
+        <h3>Deliver To</h3>
+        <p>{{deliveryAddress}}</p>
+      </div>
+    </div>
+
+    <!-- NDIS details -->
+    {{#if isNdis}}
+    <div class="billing-detail">
+      <h3>NDIS Billing Information</h3>
+      <div class="billing-detail-grid">
+        <div class="billing-field">
+          <label>NDIS Number</label>
+          <span>{{ndisNumber}}</span>
+        </div>
+        <div class="billing-field">
+          <label>Plan Manager / Coordinator</label>
+          <span>{{providerName}}</span>
+        </div>
+        {{#if providerEmail}}
+        <div class="billing-field">
+          <label>Provider Invoice Email</label>
+          <span>{{providerEmail}}</span>
+        </div>
+        {{/if}}
+      </div>
+    </div>
+    {{/if}}
+
+    <!-- Aged Care details -->
+    {{#if isAgedCare}}
+    <div class="billing-detail">
+      <h3>Aged Care Billing Information</h3>
+      <div class="billing-detail-grid">
+        <div class="billing-field">
+          <label>Package Level</label>
+          <span>{{packageLevel}}</span>
+        </div>
+        {{#if providerName}}
+        <div class="billing-field">
+          <label>Provider / Coordinator</label>
+          <span>{{providerName}}</span>
+        </div>
+        {{/if}}
+      </div>
+    </div>
+    {{/if}}
+
+    <!-- Line items -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th class="right" style="width:60px">Qty</th>
+            <th class="right" style="width:90px">Unit Price</th>
+            <th class="right" style="width:90px">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each lineItems}}
+          <tr>
+            <td>
+              <div class="item-title">{{this.title}}</div>
+              {{#if this.variant}}<div class="item-variant">{{this.variant}}</div>{{/if}}
+              {{#if this.sku}}<div class="item-sku">SKU: {{this.sku}}</div>{{/if}}
+            </td>
+            <td class="right">{{this.quantity}}</td>
+            <td class="right">{{this.price}}</td>
+            <td class="right">{{this.total}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Totals -->
+    <div class="totals-wrap">
+      <table class="totals-table">
+        <tr>
+          <td class="label">Subtotal</td>
+          <td class="value">{{subtotal}}</td>
+        </tr>
+        <tr>
+          <td class="label">GST (10%)</td>
+          <td class="value">{{tax}}</td>
+        </tr>
+        <tr class="total-row">
+          <td class="label">Total Due</td>
+          <td class="value">{{total}} AUD</td>
+        </tr>
+      </table>
+    </div>
+    <div class="gst-note">{{gstNote}}</div>
+
+    <!-- Customer notes -->
+    {{#if customerNotes}}
+    <div class="notes-section">
+      <h3>Order Notes</h3>
+      <p>{{customerNotes}}</p>
+    </div>
+    {{/if}}
+
+  </div><!-- /body -->
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>
+      <strong>{{storeName}}</strong> · ABN {{storeAbn}}
+    </div>
+    <div>
+      This document is a valid tax invoice for GST purposes.
+    </div>
+  </div>
+  <div class="payment-terms">
+    Payment terms: 14 days from invoice date · Please quote invoice number {{invoiceNumber}} on all payments.
+  </div>
+
+</div>
+</body>
+</html>
