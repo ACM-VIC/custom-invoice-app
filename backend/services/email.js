@@ -7,16 +7,21 @@ const nodemailer = require('nodemailer');
 
 // ── Transporter (Outlook / Office 365 SMTP) ──────────────────────────────────
 function createTransporter() {
+  const user = process.env.OUTLOOK_EMAIL;
+  const pass = process.env.OUTLOOK_APP_PASSWORD;
+
+  if (!user || !pass) {
+    throw new Error('Missing OUTLOOK_EMAIL or OUTLOOK_APP_PASSWORD environment variables.');
+  }
+
   return nodemailer.createTransport({
     host: 'smtp.office365.com',
     port: 587,
-    secure: false,                  // STARTTLS
-    auth: {
-      user: process.env.OUTLOOK_EMAIL        || 'no-reply@agedcareandmedical.com.au',
-      pass: process.env.OUTLOOK_APP_PASSWORD || 'AlabangChelse@3196!',
-    },
+    secure: false, // STARTTLS
+    auth: { user, pass },
     tls: {
-      ciphers: 'SSLv3',
+      // FIX: Removed deprecated SSLv3 cipher — it is disabled on all modern servers
+      // and was causing SMTP handshake failures on Azure.
       rejectUnauthorized: false,
     },
   });
@@ -102,7 +107,7 @@ function buildEmailHtml({ formType, formData, draftOrder }) {
 async function sendInvoice({ formType, formData, draftOrder, pdfBuffer }) {
   const transporter = createTransporter();
   const storeName   = process.env.STORE_NAME  || 'Aged Care & Medical';
-  const fromEmail   = process.env.OUTLOOK_EMAIL || 'no-reply@agedcareandmedical.com.au';
+  const fromEmail   = process.env.OUTLOOK_EMAIL;
   const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
 
   const toAddresses = [formData.email];

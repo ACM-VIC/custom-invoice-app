@@ -1,10 +1,22 @@
 /**
  * PDF Service
- * Generates a professional tax invoice PDF using Puppeteer (headless Chrome).
- * Returns a Buffer suitable for email attachment.
+ * Generates a professional tax invoice PDF using Puppeteer Core +
+ * @sparticuz/chromium — a Chromium build designed for serverless/Azure
+ * environments where the system does NOT have Chrome installed.
+ *
+ * FIX: The original service used `puppeteer` (full package) which bundles
+ * its own Chromium but fails on Azure App Service due to sandbox restrictions
+ * and missing system dependencies. This version uses puppeteer-core +
+ * @sparticuz/chromium which is purpose-built for these environments.
+ *
+ * Required packages (add to package.json):
+ *   "@sparticuz/chromium": "^123.0.0"
+ *   "puppeteer-core": "^22.0.0"
+ *   "handlebars": "^4.7.8"
  */
 
-const puppeteer  = require('puppeteer');
+const chromium   = require('@sparticuz/chromium');
+const puppeteer  = require('puppeteer-core');
 const Handlebars = require('handlebars');
 const fs         = require('fs');
 const path       = require('path');
@@ -21,7 +33,7 @@ Handlebars.registerHelper('formatDate', dateStr =>
 Handlebars.registerHelper('eq', (a, b) => a === b);
 
 // Load and compile template once at startup
-const templatePath  = path.join(__dirname, '../templates/invoice.html');
+const templatePath   = path.join(__dirname, '../templates/invoice.html');
 const templateSource = fs.readFileSync(templatePath, 'utf8');
 const template       = Handlebars.compile(templateSource);
 
@@ -110,9 +122,21 @@ async function generateInvoice({ formType, formData, draftOrder }) {
 
   const html = template(templateData);
 
+  // FIX: Use @sparticuz/chromium to get a valid executablePath on Azure.
+  // chromium.executablePath() downloads/extracts the Chromium binary on first
+  // run and caches it — works on Azure App Service, Lambda, and other
+  // restricted environments where `puppeteer` (full package) fails.
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH
+    || await chromium.executablePath();
+
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    executablePath,
+    headless: chromium.headless,
+    args: [
+      ...chromium.args,             // includes --no-sandbox, --disable-gpu, etc.
+      '--disable-dev-shm-usage',    // prevent /dev/shm crashes on Azure
+      '--single-process',           // required for some Azure sandbox configs
+    ],
   });
 
   try {
