@@ -8,13 +8,15 @@ const orderRoute = require('./routes/submit-order');
 const app  = express();
 const PORT = process.env.PORT || 8080;
 
+// ── Trust Azure's reverse proxy ───────────────────────────────────────────────
+app.set('trust proxy', 1);
+
 // ── Security middleware ───────────────────────────────────────────────────────
 app.use(helmet());
-
 app.use(cors({
   origin: [
-      `https://${process.env.SHOPIFY_SHOP_DOMAIN || 'agedcareandmedical.com.au'}`,
-    ],
+    `https://${process.env.SHOPIFY_SHOP_DOMAIN || 'agedcareandmedical.com.au'}`,
+  ],
   methods: ['POST', 'OPTIONS'],
 }));
 
@@ -29,7 +31,6 @@ app.use(express.json({ limit: '2mb' }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', orderRoute);
-
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // ── Start ─────────────────────────────────────────────────────────────────────
