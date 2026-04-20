@@ -1,22 +1,9 @@
 /**
  * PDF Service
- * Generates a professional tax invoice PDF using Puppeteer Core +
- * @sparticuz/chromium — a Chromium build designed for serverless/Azure
- * environments where the system does NOT have Chrome installed.
- *
- * FIX: The original service used `puppeteer` (full package) which bundles
- * its own Chromium but fails on Azure App Service due to sandbox restrictions
- * and missing system dependencies. This version uses puppeteer-core +
- * @sparticuz/chromium which is purpose-built for these environments.
- *
- * Required packages (add to package.json):
- *   "@sparticuz/chromium": "^123.0.0"
- *   "puppeteer-core": "^22.0.0"
- *   "handlebars": "^4.7.8"
+ * Generates a professional tax invoice PDF using Puppeteer + Handlebars.
  */
 
-const chromium   = require('@sparticuz/chromium');
-const puppeteer  = require('puppeteer-core');
+const puppeteer  = require('puppeteer');
 const Handlebars = require('handlebars');
 const fs         = require('fs');
 const path       = require('path');
@@ -37,9 +24,6 @@ const templatePath   = path.join(__dirname, '../templates/invoice.html');
 const templateSource = fs.readFileSync(templatePath, 'utf8');
 const template       = Handlebars.compile(templateSource);
 
-/**
- * Format line items from Shopify draft order for the template.
- */
 function formatLineItems(draftOrder) {
   return (draftOrder.line_items || []).map(item => ({
     title:    item.title,
@@ -52,9 +36,6 @@ function formatLineItems(draftOrder) {
   }));
 }
 
-/**
- * Generate a PDF invoice buffer.
- */
 async function generateInvoice({ formType, formData, draftOrder }) {
   const STORE_NAME    = process.env.STORE_NAME    || 'Aged Care & Medical';
   const STORE_ABN     = process.env.STORE_ABN     || '54 164 689 294';
@@ -67,14 +48,12 @@ async function generateInvoice({ formType, formData, draftOrder }) {
   const total    = parseFloat(draftOrder.total_price     || 0).toFixed(2);
 
   const templateData = {
-    // Store info
     storeName:    STORE_NAME,
     storeAbn:     STORE_ABN,
     storeEmail:   STORE_EMAIL,
     storePhone:   STORE_PHONE,
     storeAddress: STORE_ADDRESS,
 
-    // Invoice meta
     invoiceNumber: draftOrder.name,
     invoiceDate:   new Date().toLocaleDateString('en-AU', {
                      day: '2-digit', month: 'long', year: 'numeric'
@@ -83,12 +62,10 @@ async function generateInvoice({ formType, formData, draftOrder }) {
                day: '2-digit', month: 'long', year: 'numeric'
              }),
 
-    // Billing type
-    isNdis:     formType === 'ndis',
-    isAgedCare: formType === 'aged_care',
+    isNdis:      formType === 'ndis',
+    isAgedCare:  formType === 'aged_care',
     billingType: formType === 'ndis' ? 'NDIS' : 'Aged Care',
 
-    // Customer
     customerName:  `${formData.first_name} ${formData.last_name}`,
     customerEmail: formData.email,
     deliveryAddress: [
@@ -97,45 +74,29 @@ async function generateInvoice({ formType, formData, draftOrder }) {
       'Australia'
     ].join(', '),
 
-    // NDIS-specific
-    ndisNumber:     formData.ndis_number     || '',
-    providerName:   formData.provider_name   || '',
-    providerEmail:  formData.provider_email  || '',
+    ndisNumber:    formData.ndis_number   || '',
+    providerName:  formData.provider_name  || '',
+    providerEmail: formData.provider_email || '',
+    packageLevel:  formData.package_level  || '',
+    customerNotes: formData.notes          || '',
 
-    // Aged Care-specific
-    packageLevel: formData.package_level || '',
-
-    // Notes
-    customerNotes: formData.notes || '',
-
-    // Line items
     lineItems: formatLineItems(draftOrder),
 
-    // Totals
     subtotal: `$${subtotal}`,
     tax:      `$${tax}`,
     total:    `$${total}`,
-
-    // GST note
-    gstNote: `GST included in total: $${tax}`,
+    gstNote:  `GST included in total: $${tax}`,
   };
 
   const html = template(templateData);
 
-  // FIX: Use @sparticuz/chromium to get a valid executablePath on Azure.
-  // chromium.executablePath() downloads/extracts the Chromium binary on first
-  // run and caches it — works on Azure App Service, Lambda, and other
-  // restricted environments where `puppeteer` (full package) fails.
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH
-    || await chromium.executablePath();
-
   const browser = await puppeteer.launch({
-    executablePath,
-    headless: chromium.headless,
+    headless: 'new',
     args: [
-      ...chromium.args,             // includes --no-sandbox, --disable-gpu, etc.
-      '--disable-dev-shm-usage',    // prevent /dev/shm crashes on Azure
-      '--single-process',           // required for some Azure sandbox configs
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--single-process',
     ],
   });
 

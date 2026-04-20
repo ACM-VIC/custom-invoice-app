@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@sparticuz/chromium": "^147.0.0",
-    "puppeteer-core": "^24.41.0"
+    "handlebars": "^4.7.9",
+    "puppeteer": "^24.41.0"
   }
 }
