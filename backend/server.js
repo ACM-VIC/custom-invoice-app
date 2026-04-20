@@ -13,18 +13,33 @@ app.set('trust proxy', 1);
 
 // ── Security middleware ───────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
+const corsOptions = {
   origin: [
-    `https://${process.env.SHOPIFY_SHOP_DOMAIN || 'agedcareandmedical.com.au'}`,
+    'https://agedcareandmedical.com.au',
+    'https://www.agedcareandmedical.com.au',
   ],
   methods: ['POST', 'OPTIONS'],
-}));
+  allowedHeaders: ['Content-Type'],
+  credentials: false,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // handle preflight requests
 
-// Rate limit: max 20 submissions per 15 minutes per IP
+// ── Rate limit: max 20 submissions per 15 minutes per IP ─────────────────────
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: { error: 'Too many requests, please try again later.' }
+  message: { error: 'Too many requests, please try again later.' },
+  keyGenerator: (req) => {
+    const raw = req.ip
+      || (req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+      || req.socket.remoteAddress
+      || 'unknown';
+    // Strip IPv6 prefix and port e.g. "::ffff:1.2.3.4" or "1.2.3.4:28578"
+    return raw.replace(/^::ffff:/, '').replace(/:\d+$/, '');
+  },
 }));
 
 app.use(express.json({ limit: '2mb' }));
