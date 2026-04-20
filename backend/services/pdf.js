@@ -100,6 +100,7 @@ async function generateInvoice({ formType, formData, draftOrder }) {
     ],
   });
 
+  
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
