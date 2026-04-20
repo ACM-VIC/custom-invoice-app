@@ -124,6 +124,14 @@ async function createDraftOrder({ formType, formData, cart }) {
   }
 
   const data = await response.json();
+
+  // ── Debug: log raw Shopify response ───────────────────────────────────────
+  console.log('[DEBUG] Shopify raw response:', JSON.stringify(data, null, 2));
+  if (!data.draft_order) {
+    throw new Error(`Shopify response missing draft_order. Full response: ${JSON.stringify(data)}`);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   return data.draft_order;
 }
 
