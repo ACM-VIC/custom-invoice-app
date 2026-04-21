@@ -25,7 +25,7 @@ apt-get update -qq && apt-get install -y -qq \
 
 echo "Downloading Chrome for Puppeteer..."
 cd /home/site/wwwroot
-/node_modules/.bin/puppeteer browsers install chrome
+node /node_modules/puppeteer/lib/cjs/puppeteer/node/cli.js browsers install chrome
 
 echo "Starting app..."
 npm start

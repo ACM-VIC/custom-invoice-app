@@ -2,7 +2,6 @@
  * PDF Service
  * Generates a professional tax invoice PDF using Puppeteer + Handlebars.
  */
-
 const puppeteer  = require('puppeteer');
 const Handlebars = require('handlebars');
 const fs         = require('fs');
@@ -36,6 +35,30 @@ function formatLineItems(draftOrder) {
   }));
 }
 
+// Resolve the Chrome executable that Puppeteer downloaded at startup
+function getChromePath() {
+  try {
+    // This is the standard cache location Puppeteer uses on Linux
+    const { executablePath } = require('puppeteer');
+    return executablePath();
+  } catch (e) {
+    // Fallback: walk the known cache directory
+    const cacheDir = path.join(
+      process.env.HOME || '/root',
+      '.cache', 'puppeteer', 'chrome'
+    );
+    if (fs.existsSync(cacheDir)) {
+      // Find the first chrome binary inside the cache
+      const entries = fs.readdirSync(cacheDir);
+      for (const entry of entries) {
+        const candidate = path.join(cacheDir, entry, 'chrome-linux64', 'chrome');
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+    throw new Error(`Chrome not found. Looked in ${cacheDir}`);
+  }
+}
+
 async function generateInvoice({ formType, formData, draftOrder }) {
   const STORE_NAME    = process.env.STORE_NAME    || 'Aged Care & Medical';
   const STORE_ABN     = process.env.STORE_ABN     || '54 164 689 294';
@@ -53,7 +76,6 @@ async function generateInvoice({ formType, formData, draftOrder }) {
     storeEmail:   STORE_EMAIL,
     storePhone:   STORE_PHONE,
     storeAddress: STORE_ADDRESS,
-
     invoiceNumber: draftOrder.name,
     invoiceDate:   new Date().toLocaleDateString('en-AU', {
                      day: '2-digit', month: 'long', year: 'numeric'
@@ -61,11 +83,9 @@ async function generateInvoice({ formType, formData, draftOrder }) {
     dueDate: new Date(Date.now() + 14 * 86400000).toLocaleDateString('en-AU', {
                day: '2-digit', month: 'long', year: 'numeric'
              }),
-
     isNdis:      formType === 'ndis',
     isAgedCare:  formType === 'aged_care',
     billingType: formType === 'ndis' ? 'NDIS' : 'Aged Care',
-
     customerName:  `${formData.first_name} ${formData.last_name}`,
     customerEmail: formData.email,
     deliveryAddress: [
@@ -73,15 +93,12 @@ async function generateInvoice({ formType, formData, draftOrder }) {
       `${formData.suburb} ${formData.state} ${formData.postcode}`,
       'Australia'
     ].join(', '),
-
     ndisNumber:    formData.ndis_number   || '',
     providerName:  formData.provider_name  || '',
     providerEmail: formData.provider_email || '',
     packageLevel:  formData.package_level  || '',
     customerNotes: formData.notes          || '',
-
     lineItems: formatLineItems(draftOrder),
-
     subtotal: `$${subtotal}`,
     tax:      `$${tax}`,
     total:    `$${total}`,
@@ -92,6 +109,7 @@ async function generateInvoice({ formType, formData, draftOrder }) {
 
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: getChromePath(),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
