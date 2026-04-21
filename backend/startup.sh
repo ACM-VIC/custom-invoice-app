@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 echo "Installing Chromium system dependencies..."
 apt-get update -qq && apt-get install -y -qq \
   libnss3 \
@@ -20,6 +22,10 @@ apt-get update -qq && apt-get install -y -qq \
   libx11-xcb1 \
   libxcb1 \
   libxext6
-echo "Dependencies installed. Starting app..."
+
+echo "Downloading Chrome for Puppeteer..."
 cd /home/site/wwwroot
+node_modules/.bin/puppeteer browsers install chrome
+
+echo "Starting app..."
 npm start
