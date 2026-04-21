@@ -1,9 +1,11 @@
 /**
  * PDF Service
- * Generates a professional tax invoice PDF using Puppeteer + Handlebars.
+ * Generates a professional tax invoice PDF using Puppeteer-core + Handlebars.
+ * Uses @sparticuz/chromium instead of full puppeteer for fast CI/Azure installs.
  */
 
-const puppeteer  = require('puppeteer');
+const puppeteer  = require('puppeteer-core');
+const chromium   = require('@sparticuz/chromium');
 const Handlebars = require('handlebars');
 const fs         = require('fs');
 const path       = require('path');
@@ -91,16 +93,12 @@ async function generateInvoice({ formType, formData, draftOrder }) {
   const html = template(templateData);
 
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--single-process',
-    ],
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 
-  
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
