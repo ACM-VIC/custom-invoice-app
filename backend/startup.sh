@@ -21,4 +21,5 @@ apt-get update -qq && apt-get install -y -qq \
   libxcb1 \
   libxext6
 echo "Dependencies installed. Starting app..."
+cd /home/site/wwwroot
 npm start
