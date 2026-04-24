@@ -5,20 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tax Invoice — Aged Care &amp; Medical</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Arbutus+Slab&family=Montserrat:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap');
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --accent:      #DC4E00;
-      --accent-light:#fff4ee;
+      --accent:      {{#if isNdis}}#84164E{{else}}#DC4E00{{/if}};
+      --accent-light:{{#if isNdis}}#f9eef4{{else}}#fff4ee{{/if}};
       --grey-bg:     #f4f4f4;
       --grey-line:   #e0e0e0;
       --text-dark:   #1a1a1a;
       --text-mid:    #696969;
       --text-light:  #929487;
       --sidebar-w:   48px;
-      --transition:  0.35s cubic-bezier(.4,0,.2,1);
     }
 
     html, body {
@@ -28,69 +27,12 @@
       color: var(--text-dark);
     }
 
-    /* ── SELECTOR UI ── */
-    .type-selector {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      padding: 28px 0 20px;
-    }
-    .type-btn {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 24px;
-      border-radius: 50px;
-      border: 2px solid var(--grey-line);
-      background: #fff;
-      font-family: 'Montserrat', sans-serif;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all var(--transition);
-      color: var(--text-mid);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .type-btn .btn-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--grey-line);
-      transition: background var(--transition);
-      flex-shrink: 0;
-    }
-    /* Aged Care active */
-    .type-btn.aged-care-btn.active {
-      border-color: #DC4E00;
-      color: #DC4E00;
-      background: #fff4ee;
-      box-shadow: 0 4px 16px rgba(220,78,0,0.15);
-    }
-    .type-btn.aged-care-btn.active .btn-dot { background: #DC4E00; }
-
-    /* NDIS active */
-    .type-btn.ndis-btn.active {
-      border-color: #84164E;
-      color: #84164E;
-      background: #f9eef4;
-      box-shadow: 0 4px 16px rgba(132,22,78,0.15);
-    }
-    .type-btn.ndis-btn.active .btn-dot { background: #84164E; }
-
-    .type-btn:hover:not(.active) {
-      border-color: #bbb;
-      color: var(--text-dark);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
     /* ── PAGE ── */
     .page {
       position: relative;
       width: 794px;
       min-height: 1123px;
-      margin: 0 auto 48px;
+      margin: 0 auto;
       background: #fff;
       display: flex;
       box-shadow: 0 8px 40px rgba(0,0,0,0.12);
@@ -106,7 +48,6 @@
       justify-content: center;
       overflow: hidden;
       position: relative;
-      transition: background var(--transition);
     }
     .sidebar::before {
       content: '';
@@ -126,7 +67,6 @@
       text-transform: uppercase;
       white-space: nowrap;
       opacity: 0.92;
-      transition: opacity 0.15s;
     }
 
     /* ── CONTENT ── */
@@ -162,7 +102,6 @@
       margin-top: 4px;
       letter-spacing: 0.5px;
       font-family: 'Montserrat', sans-serif;
-      transition: color var(--transition);
     }
     .biz-details {
       margin-top: 10px;
@@ -232,7 +171,6 @@
       background: var(--accent);
       border-radius: 2px;
       flex-shrink: 0;
-      transition: background var(--transition);
     }
     .party-content {
       font-size: 12px;
@@ -304,9 +242,9 @@
     tbody tr:last-child { border-bottom: none; }
     tbody td { padding: 14px 12px; vertical-align: middle; color: var(--text-dark); font-size: 12.5px; }
     td.right { text-align: right; }
-    .desc-name { font-weight: 600; }
-    .desc-sku  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
-    .desc-variant { font-size: 11px; color: var(--text-mid); margin-top: 1px; }
+    .desc-name    { font-weight: 600; }
+    .desc-sku     { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+    .desc-variant { font-size: 11px; color: var(--text-mid);   margin-top: 1px; }
 
     /* ── TOTALS ── */
     .totals-wrap { margin-top: 24px; display: flex; justify-content: flex-end; }
@@ -331,7 +269,6 @@
       font-size: 16px; font-weight: 700;
       color: var(--accent);
       font-family: 'Montserrat', sans-serif;
-      transition: color var(--transition);
     }
     .gst-note {
       font-size: 11px;
@@ -352,6 +289,7 @@
       font-size: 12px;
       font-weight: 600;
       color: var(--text-dark);
+      margin-bottom: 4px;
     }
     .notes-line {
       margin-top: 20px;
@@ -369,36 +307,21 @@
       letter-spacing: 0.2px;
     }
 
-    /* ── TRANSITIONS for theme swap ── */
-    .page { transition: box-shadow var(--transition); }
-
     @media print {
       body { background: #fff; }
-      .type-selector { display: none; }
       .page { margin: 0; box-shadow: none; width: 100%; }
     }
   </style>
 </head>
 <body>
 
-<!-- ── TYPE SELECTOR ── -->
-<div class="type-selector">
-  <button class="type-btn aged-care-btn active" onclick="setType('aged_care')">
-    <span class="btn-dot"></span>
-    I have Aged Care
-  </button>
-  <button class="type-btn ndis-btn" onclick="setType('ndis')">
-    <span class="btn-dot"></span>
-    I have NDIS
-  </button>
-</div>
-
-<!-- ── INVOICE PAGE ── -->
-<div class="page" id="invoicePage">
+<div class="page">
 
   <!-- SIDEBAR -->
-  <div class="sidebar" id="sidebar">
-    <span class="sidebar-text" id="sidebarText">AGED CARE &amp; MEDICAL INVOICE</span>
+  <div class="sidebar">
+    <span class="sidebar-text">
+      {{#if isNdis}}NDIS INVOICE{{else}}AGED CARE &amp; MEDICAL INVOICE{{/if}}
+    </span>
   </div>
 
   <div class="content">
@@ -406,7 +329,8 @@
     <!-- HEADER -->
     <div class="header">
       <div class="logo-area">
-        <img src="https://cdn.shopify.com/s/files/1/0363/8955/2187/files/ACM_header_logo.png?v=1776935561" alt="Aged Care &amp; Medical" />
+        <img src="https://cdn.shopify.com/s/files/1/0363/8955/2187/files/ACM_header_logo.png?v=1776935561"
+             alt="Aged Care &amp; Medical" />
       </div>
       <div class="invoice-meta">
         <div class="invoice-title">TAX INVOICE</div>
@@ -452,16 +376,64 @@
         <div class="party-title"><span class="party-dot"></span> Deliver To</div>
         <div class="party-content">
           <strong>{{deliverTo.address}}</strong>
-          {{#if deliverTo.phone}}{{deliverTo.phone}}{{/if}}
+          {{#if deliverTo.phone}}<br>{{deliverTo.phone}}{{/if}}
         </div>
       </div>
     </div>
 
-    <!-- SERVICE BOX — swapped by JS -->
+    <!-- SERVICE BOX — rendered server-side by Handlebars, no JS needed -->
     <div class="service-box">
-      <div class="service-box-title" id="serviceBoxTitle">Aged Care Billing Information</div>
-      <div class="service-fields" id="serviceFields">
-        <!-- populated by JS -->
+      <div class="service-box-title">
+        {{#if isNdis}}NDIS Service Details{{else}}Aged Care Billing Information{{/if}}
+      </div>
+      <div class="service-fields">
+        {{#if isNdis}}
+          <div>
+            <div class="service-field-label">Participant Name</div>
+            <div class="service-field-value">{{billTo.name}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">NDIS Number</div>
+            <div class="service-field-value">{{ndis.number}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Funding Type</div>
+            <div class="service-field-value">{{ndis.fundingType}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Plan Manager</div>
+            <div class="service-field-value">{{ndis.providerName}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Provider Email</div>
+            <div class="service-field-value">{{ndis.providerEmail}}</div>
+          </div>
+        {{else}}
+          <div>
+            <div class="service-field-label">Client Name</div>
+            <div class="service-field-value">{{billTo.name}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Client ID</div>
+            <div class="service-field-value">{{agedCare.clientId}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Care Level</div>
+            <div class="service-field-value">{{agedCare.packageLevel}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Funding Type</div>
+            <div class="service-field-value">{{agedCare.fundingType}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Provider Name</div>
+            <div class="service-field-value">{{agedCare.providerName}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Reference</div>
+            <div class="service-field-value">{{reference}}</div>
+          </div>
+        {{/if}}
       </div>
     </div>
 
@@ -497,8 +469,8 @@
     <div class="totals-wrap">
       <div class="totals-table">
         {{#if reference}}
-        <div class="totals-row" id="referenceRow">
-          <span class="label" id="referenceLabel">{{referenceLabel}}</span>
+        <div class="totals-row">
+          <span class="label">{{referenceLabel}}</span>
           <span class="value">{{reference}}</span>
         </div>
         {{/if}}
@@ -529,17 +501,20 @@
     {{/if}}
 
     <!-- PAYMENT DETAILS -->
+    {{#if bankName}}
     <div class="payment-details">
       <strong>Payment Details</strong>
-      {{#if bankName}}Bank: {{bankName}}<br>{{/if}}
+      Bank: {{bankName}}<br>
       {{#if accountName}}Account Name: {{accountName}}<br>{{/if}}
       {{#if bsb}}BSB: {{bsb}}<br>{{/if}}
       {{#if accountNumber}}Account Number: {{accountNumber}}{{/if}}
     </div>
+    {{/if}}
 
     <!-- NOTES -->
     {{#if customerNotes}}
     <div class="notes-line">
+      <strong style="font-size:12px;font-weight:600;color:#1a1a1a;">Notes</strong><br>
       {{customerNotes}}
     </div>
     {{/if}}
@@ -552,68 +527,5 @@
   </div>
 </div>
 
-<script>
-  const THEMES = {
-    aged_care: {
-      accent:        '#DC4E00',
-      sidebarText:   'AGED CARE &amp; MEDICAL INVOICE',
-      serviceTitle:  'Aged Care Billing Information',
-      referenceLabel:'Reference',
-      fields: [
-        { label: 'Client Name',     value: '{{billTo.name}}' },
-        { label: 'Client ID',       value: '{{agedCare.clientId}}' },
-        { label: 'Care Level',      value: '{{agedCare.packageLevel}}' },
-        { label: 'Funding Type',    value: '{{agedCare.fundingType}}' },
-        { label: 'Provider Name',   value: '{{agedCare.providerName}}' },
-        { label: 'Reference',       value: '{{reference}}' },
-      ]
-    },
-    ndis: {
-      accent:        '#84164E',
-      sidebarText:   'NDIS INVOICE',
-      serviceTitle:  'NDIS Service Details',
-      referenceLabel:'NDIS Reference',
-      fields: [
-        { label: 'Participant Name',   value: '{{billTo.name}}' },
-        { label: 'NDIS Number',        value: '{{ndis.number}}' },
-        { label: 'Support Category',   value: '{{ndis.supportCategory}}' },
-        { label: 'Funding Type',       value: '{{ndis.fundingType}}' },
-        { label: 'Plan Manager',       value: '{{ndis.providerName}}' },
-        { label: 'Provider Email',     value: '{{ndis.providerEmail}}' },
-      ]
-    }
-  };
-
-  function setType(type) {
-    const theme = THEMES[type];
-
-    // ── CSS variable (accent colour propagates everywhere) ──
-    document.documentElement.style.setProperty('--accent', theme.accent);
-
-    // ── Sidebar ──
-    document.getElementById('sidebarText').innerHTML = theme.sidebarText;
-
-    // ── Service box ──
-    document.getElementById('serviceBoxTitle').textContent = theme.serviceTitle;
-    const fieldsEl = document.getElementById('serviceFields');
-    fieldsEl.innerHTML = theme.fields.map(f => `
-      <div>
-        <div class="service-field-label">${f.label}</div>
-        <div class="service-field-value">${f.value}</div>
-      </div>
-    `).join('');
-
-    // ── Totals reference label ──
-    const refLabel = document.getElementById('referenceLabel');
-    if (refLabel) refLabel.textContent = theme.referenceLabel;
-
-    // ── Toggle active button state ──
-    document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelector(`.${type.replace('_','-')}-btn`).classList.add('active');
-  }
-
-  // Initialise with Aged Care fields on load
-  setType('aged_care');
-</script>
 </body>
 </html>
