@@ -306,6 +306,7 @@
     td.right { text-align: right; }
     .desc-name { font-weight: 600; }
     .desc-sku  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+    .desc-variant { font-size: 11px; color: var(--text-mid); margin-top: 1px; }
 
     /* ── TOTALS ── */
     .totals-wrap { margin-top: 24px; display: flex; justify-content: flex-end; }
@@ -331,6 +332,12 @@
       color: var(--accent);
       font-family: 'Montserrat', sans-serif;
       transition: color var(--transition);
+    }
+    .gst-note {
+      font-size: 11px;
+      color: var(--text-light);
+      text-align: right;
+      margin-top: 6px;
     }
 
     /* ── PAYMENT / NOTES / FOOTER ── */
@@ -403,12 +410,13 @@
       </div>
       <div class="invoice-meta">
         <div class="invoice-title">TAX INVOICE</div>
-        <div class="invoice-num">#D1175</div>
+        <div class="invoice-num">{{invoiceNumber}}</div>
         <div class="biz-details">
-          <strong>Aged Care &amp; Medical</strong>
-          ABN: 54 156 589 244<br>
-          Phone: (356) 003 830<br>
-          46/197 Wells Road, Chelsea Heights VIC 3196
+          <strong>{{storeName}}</strong>
+          {{#if storeAddress}}{{storeAddress}}<br>{{/if}}
+          ABN: {{storeAbn}}<br>
+          {{#if storePhone}}Phone: {{storePhone}}<br>{{/if}}
+          {{#if storeEmail}}{{storeEmail}}{{/if}}
         </div>
       </div>
     </div>
@@ -417,15 +425,15 @@
     <div class="date-bar">
       <div class="date-bar-item">
         <div class="date-label">Issued Date</div>
-        <div class="date-value">23 April 2026</div>
+        <div class="date-value">{{invoiceDate}}</div>
       </div>
       <div class="date-bar-item">
         <div class="date-label">Due Date</div>
-        <div class="date-value">07 May 2026</div>
+        <div class="date-value">{{dueDate}}</div>
       </div>
       <div class="date-bar-item">
         <div class="date-label">Payment Terms</div>
-        <div class="date-value">14 Days</div>
+        <div class="date-value">{{paymentTerms}}</div>
       </div>
     </div>
 
@@ -434,17 +442,17 @@
       <div class="party-box">
         <div class="party-title"><span class="party-dot"></span> Bill To</div>
         <div class="party-content">
-          <strong>Renan Billion</strong>
-          46/197 Wells Road, Chelsea Heights VIC 3196<br>
-          renanjoseph.billorn@gmail.com<br>
-          0400 000 000
+          <strong>{{billTo.name}}</strong>
+          {{#if billTo.address}}{{billTo.address}}<br>{{/if}}
+          {{#if billTo.email}}{{billTo.email}}<br>{{/if}}
+          {{#if billTo.phone}}{{billTo.phone}}{{/if}}
         </div>
       </div>
       <div class="party-box">
         <div class="party-title"><span class="party-dot"></span> Deliver To</div>
         <div class="party-content">
-          <strong>46/197 Wells Road, Chelsea Heights,<br>Victoria, Melbourne VIC 3000</strong><br>
-          0400 000 000
+          <strong>{{deliverTo.address}}</strong>
+          {{#if deliverTo.phone}}{{deliverTo.phone}}{{/if}}
         </div>
       </div>
     </div>
@@ -469,15 +477,18 @@
           </tr>
         </thead>
         <tbody>
+          {{#each lineItems}}
           <tr>
             <td>
-              <div class="desc-name">30" Safety Bed Rail</div>
-              <div class="desc-sku">SKU: N50081</div>
+              <div class="desc-name">{{this.title}}</div>
+              {{#if this.variant}}<div class="desc-variant">{{this.variant}}</div>{{/if}}
+              {{#if this.sku}}<div class="desc-sku">SKU: {{this.sku}}</div>{{/if}}
             </td>
-            <td class="right">1</td>
-            <td class="right">$259.00</td>
-            <td class="right">$259.00</td>
+            <td class="right">{{this.quantity}}</td>
+            <td class="right">{{this.price}}</td>
+            <td class="right">{{this.total}}</td>
           </tr>
+          {{/each}}
         </tbody>
       </table>
     </div>
@@ -485,47 +496,57 @@
     <!-- TOTALS -->
     <div class="totals-wrap">
       <div class="totals-table">
+        {{#if reference}}
         <div class="totals-row" id="referenceRow">
-          <span class="label" id="referenceLabel">Reference</span>
-          <span class="value">Self-Managed / Direct</span>
+          <span class="label" id="referenceLabel">{{referenceLabel}}</span>
+          <span class="value">{{reference}}</span>
         </div>
+        {{/if}}
+        {{#if poNumber}}
         <div class="totals-row">
           <span class="label">PO Number</span>
-          <span class="value">PO-2026-0042</span>
+          <span class="value">{{poNumber}}</span>
         </div>
+        {{/if}}
         <div class="totals-row">
           <span class="label">Subtotal</span>
-          <span class="value">$259.00</span>
+          <span class="value">{{subtotal}}</span>
         </div>
         <div class="totals-row">
           <span class="label">GST (10%)</span>
-          <span class="value">$23.55</span>
+          <span class="value">{{tax}}</span>
         </div>
         <hr class="totals-divider" />
         <div class="totals-row grand">
           <span class="label">Total Due</span>
-          <span class="value">$259.00 AUD</span>
+          <span class="value">{{total}} AUD</span>
         </div>
       </div>
     </div>
 
+    {{#if gstNote}}
+    <div class="gst-note">{{gstNote}}</div>
+    {{/if}}
+
     <!-- PAYMENT DETAILS -->
     <div class="payment-details">
       <strong>Payment Details</strong>
-      Bank: Commonwealth Bank<br>
-      Account Name: Aged Care &amp; Medical Pty Ltd<br>
-      BSB: 062-000<br>
-      Account Number: 1234 5678
+      {{#if bankName}}Bank: {{bankName}}<br>{{/if}}
+      {{#if accountName}}Account Name: {{accountName}}<br>{{/if}}
+      {{#if bsb}}BSB: {{bsb}}<br>{{/if}}
+      {{#if accountNumber}}Account Number: {{accountNumber}}{{/if}}
     </div>
 
     <!-- NOTES -->
+    {{#if customerNotes}}
     <div class="notes-line">
-      Please allow 2–3 business days for delivery. For enquiries contact support@agedcaremedical.com.au
+      {{customerNotes}}
     </div>
+    {{/if}}
 
     <!-- FOOTER -->
     <div class="footer">
-      Thank you for choosing Aged Care &amp; Medical. Please quote invoice #D1175 for all payments.
+      Thank you for choosing {{storeName}}. Please quote invoice {{invoiceNumber}} for all payments.
     </div>
 
   </div>
@@ -539,12 +560,12 @@
       serviceTitle:  'Aged Care Billing Information',
       referenceLabel:'Reference',
       fields: [
-        { label: 'Client Name',   value: 'Renan Billion' },
-        { label: 'Client ID',     value: '4300000001' },
-        { label: 'Care Level',    value: 'Level 2' },
-        { label: 'Funding Type',  value: 'HCP — Home Care Package' },
-        { label: 'Provider Name', value: 'My Aged Care' },
-        { label: 'Reference',     value: 'Self-Managed / Direct' },
+        { label: 'Client Name',     value: '{{billTo.name}}' },
+        { label: 'Client ID',       value: '{{agedCare.clientId}}' },
+        { label: 'Care Level',      value: '{{agedCare.packageLevel}}' },
+        { label: 'Funding Type',    value: '{{agedCare.fundingType}}' },
+        { label: 'Provider Name',   value: '{{agedCare.providerName}}' },
+        { label: 'Reference',       value: '{{reference}}' },
       ]
     },
     ndis: {
@@ -553,12 +574,12 @@
       serviceTitle:  'NDIS Service Details',
       referenceLabel:'NDIS Reference',
       fields: [
-        { label: 'Participant Name',  value: 'Renan Billion' },
-        { label: 'NDIS Number',       value: '430 000 0001' },
-        { label: 'Support Category',  value: 'Assistive Technology' },
-        { label: 'Funding Type',      value: 'Plan Managed' },
-        { label: 'Plan Manager',      value: 'My Plan Manager' },
-        { label: 'Reference',         value: 'PO-2026-0042' },
+        { label: 'Participant Name',   value: '{{billTo.name}}' },
+        { label: 'NDIS Number',        value: '{{ndis.number}}' },
+        { label: 'Support Category',   value: '{{ndis.supportCategory}}' },
+        { label: 'Funding Type',       value: '{{ndis.fundingType}}' },
+        { label: 'Plan Manager',       value: '{{ndis.providerName}}' },
+        { label: 'Provider Email',     value: '{{ndis.providerEmail}}' },
       ]
     }
   };
@@ -583,7 +604,8 @@
     `).join('');
 
     // ── Totals reference label ──
-    document.getElementById('referenceLabel').textContent = theme.referenceLabel;
+    const refLabel = document.getElementById('referenceLabel');
+    if (refLabel) refLabel.textContent = theme.referenceLabel;
 
     // ── Toggle active button state ──
     document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
