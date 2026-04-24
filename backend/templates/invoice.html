@@ -3,42 +3,100 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tax Invoice #D1175 — Aged Care Preview</title>
+  <title>Tax Invoice — Aged Care &amp; Medical</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Arbutus+Slab&family=Montserrat:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap');
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --accent:       #DC4E00;
-      --accent-light: #fff4ee;
-      --grey-bg:      #f4f4f4;
-      --grey-line:    #e0e0e0;
-      --grey-core:    #696969;
-      --grey-hi:      #929487;
-      --text-dark:    #1a1a1a;
-      --text-mid:     #696969;
-      --text-light:   #929487;
-      --sidebar-w:    48px;
+      --accent:      #DC4E00;
+      --accent-light:#fff4ee;
+      --grey-bg:     #f4f4f4;
+      --grey-line:   #e0e0e0;
+      --text-dark:   #1a1a1a;
+      --text-mid:    #696969;
+      --text-light:  #929487;
+      --sidebar-w:   48px;
+      --transition:  0.35s cubic-bezier(.4,0,.2,1);
     }
-    .page.ndis { --accent: #84164E; --accent-light: #f9eef4; }
 
     html, body {
-      height: 100%;
-      background: #eee;
+      min-height: 100%;
+      background: #e2e2e2;
       font-family: 'Poppins', sans-serif;
       color: var(--text-dark);
     }
 
+    /* ── SELECTOR UI ── */
+    .type-selector {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 28px 0 20px;
+    }
+    .type-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 24px;
+      border-radius: 50px;
+      border: 2px solid var(--grey-line);
+      background: #fff;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all var(--transition);
+      color: var(--text-mid);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .type-btn .btn-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--grey-line);
+      transition: background var(--transition);
+      flex-shrink: 0;
+    }
+    /* Aged Care active */
+    .type-btn.aged-care-btn.active {
+      border-color: #DC4E00;
+      color: #DC4E00;
+      background: #fff4ee;
+      box-shadow: 0 4px 16px rgba(220,78,0,0.15);
+    }
+    .type-btn.aged-care-btn.active .btn-dot { background: #DC4E00; }
+
+    /* NDIS active */
+    .type-btn.ndis-btn.active {
+      border-color: #84164E;
+      color: #84164E;
+      background: #f9eef4;
+      box-shadow: 0 4px 16px rgba(132,22,78,0.15);
+    }
+    .type-btn.ndis-btn.active .btn-dot { background: #84164E; }
+
+    .type-btn:hover:not(.active) {
+      border-color: #bbb;
+      color: var(--text-dark);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* ── PAGE ── */
     .page {
       position: relative;
       width: 794px;
       min-height: 1123px;
-      margin: 32px auto;
+      margin: 0 auto 48px;
       background: #fff;
       display: flex;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.12);
     }
 
+    /* ── LEFT SIDEBAR ── */
     .sidebar {
       flex-shrink: 0;
       width: var(--sidebar-w);
@@ -47,6 +105,15 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      position: relative;
+      transition: background var(--transition);
+    }
+    .sidebar::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 6px;
+      background: rgba(0,0,0,0.18);
     }
     .sidebar-text {
       writing-mode: vertical-rl;
@@ -59,8 +126,10 @@
       text-transform: uppercase;
       white-space: nowrap;
       opacity: 0.92;
+      transition: opacity 0.15s;
     }
 
+    /* ── CONTENT ── */
     .content {
       flex: 1;
       display: flex;
@@ -68,6 +137,7 @@
       padding: 36px 40px 40px;
     }
 
+    /* ── HEADER ── */
     .header {
       display: flex;
       justify-content: space-between;
@@ -75,17 +145,8 @@
       padding-bottom: 28px;
       border-bottom: 1.5px solid var(--grey-line);
     }
-    .logo-area {
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-    }
-    .logo-area img {
-      width: 180px;
-      height: auto;
-      display: block;
-    }
-    .invoice-meta { text-align: right; }
+    .logo-area img { width: 180px; height: auto; display: block; }
+    .invoice-meta  { text-align: right; }
     .invoice-title {
       font-family: 'Montserrat', sans-serif;
       font-weight: 700;
@@ -101,13 +162,13 @@
       margin-top: 4px;
       letter-spacing: 0.5px;
       font-family: 'Montserrat', sans-serif;
+      transition: color var(--transition);
     }
     .biz-details {
       margin-top: 10px;
       font-size: 11px;
       color: var(--text-mid);
       line-height: 1.7;
-      font-family: 'Poppins', sans-serif;
     }
     .biz-details strong {
       display: block;
@@ -116,6 +177,7 @@
       color: var(--text-dark);
     }
 
+    /* ── DATE BAR ── */
     .date-bar {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -123,7 +185,6 @@
       border-radius: 8px;
       margin-top: 24px;
       padding: 16px 20px;
-      gap: 0;
     }
     .date-bar-item {
       padding: 0 16px;
@@ -147,6 +208,7 @@
       font-family: 'Montserrat', sans-serif;
     }
 
+    /* ── PARTIES ── */
     .parties {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -166,11 +228,11 @@
       font-family: 'Montserrat', sans-serif;
     }
     .party-dot {
-      width: 10px;
-      height: 10px;
+      width: 10px; height: 10px;
       background: var(--accent);
       border-radius: 2px;
       flex-shrink: 0;
+      transition: background var(--transition);
     }
     .party-content {
       font-size: 12px;
@@ -186,6 +248,7 @@
       margin-bottom: 2px;
     }
 
+    /* ── SERVICE BOX ── */
     .service-box {
       margin-top: 24px;
       background: var(--grey-bg);
@@ -222,8 +285,9 @@
       font-family: 'Montserrat', sans-serif;
     }
 
+    /* ── TABLE ── */
     .table-wrap { margin-top: 28px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; }
     thead tr { border-bottom: 2px solid var(--grey-line); }
     thead th {
       padding: 10px 12px;
@@ -238,31 +302,13 @@
     thead th.right { text-align: right; }
     tbody tr { border-bottom: 1px solid var(--grey-line); }
     tbody tr:last-child { border-bottom: none; }
-    tbody td {
-      padding: 14px 12px;
-      vertical-align: middle;
-      color: var(--text-dark);
-      font-size: 12.5px;
-    }
+    tbody td { padding: 14px 12px; vertical-align: middle; color: var(--text-dark); font-size: 12.5px; }
     td.right { text-align: right; }
-    .product-img-cell { width: 64px; }
-    .product-img-cell img,
-    .product-img-placeholder {
-      width: 44px;
-      height: 70px;
-      object-fit: cover;
-      border-radius: 4px;
-      display: block;
-    }
-    .product-img-placeholder { background: var(--accent); }
-    .desc-name { font-weight: 600; color: var(--text-dark); }
+    .desc-name { font-weight: 600; }
     .desc-sku  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
 
-    .totals-wrap {
-      margin-top: 24px;
-      display: flex;
-      justify-content: flex-end;
-    }
+    /* ── TOTALS ── */
+    .totals-wrap { margin-top: 24px; display: flex; justify-content: flex-end; }
     .totals-table { width: 260px; }
     .totals-row {
       display: flex;
@@ -273,25 +319,38 @@
     }
     .totals-row .label { color: var(--text-mid); }
     .totals-row .value { font-weight: 500; }
-    .totals-divider {
-      border: none;
-      border-top: 1.5px solid var(--grey-line);
-      margin: 6px 0;
-    }
+    .totals-divider { border: none; border-top: 1.5px solid var(--grey-line); margin: 6px 0; }
     .totals-row.grand { padding: 10px 0 0; }
     .totals-row.grand .label {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 14px; font-weight: 700;
       color: var(--text-dark);
       font-family: 'Montserrat', sans-serif;
     }
     .totals-row.grand .value {
-      font-size: 16px;
-      font-weight: 700;
+      font-size: 16px; font-weight: 700;
       color: var(--accent);
       font-family: 'Montserrat', sans-serif;
+      transition: color var(--transition);
     }
 
+    /* ── PAYMENT / NOTES / FOOTER ── */
+    .payment-details {
+      margin-top: 28px;
+      font-size: 11px;
+      color: var(--text-mid);
+      line-height: 1.7;
+    }
+    .payment-details strong {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dark);
+    }
+    .notes-line {
+      margin-top: 20px;
+      font-size: 11px;
+      color: var(--text-mid);
+    }
     .footer {
       margin-top: auto;
       padding-top: 32px;
@@ -303,18 +362,36 @@
       letter-spacing: 0.2px;
     }
 
+    /* ── TRANSITIONS for theme swap ── */
+    .page { transition: box-shadow var(--transition); }
+
     @media print {
       body { background: #fff; }
+      .type-selector { display: none; }
       .page { margin: 0; box-shadow: none; width: 100%; }
     }
   </style>
 </head>
 <body>
-<div class="page">
 
-  <!-- LEFT SIDEBAR -->
-  <div class="sidebar">
-    <span class="sidebar-text">AGED CARE &amp; MEDICAL INVOICE</span>
+<!-- ── TYPE SELECTOR ── -->
+<div class="type-selector">
+  <button class="type-btn aged-care-btn active" onclick="setType('aged_care')">
+    <span class="btn-dot"></span>
+    I have Aged Care
+  </button>
+  <button class="type-btn ndis-btn" onclick="setType('ndis')">
+    <span class="btn-dot"></span>
+    I have NDIS
+  </button>
+</div>
+
+<!-- ── INVOICE PAGE ── -->
+<div class="page" id="invoicePage">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <span class="sidebar-text" id="sidebarText">AGED CARE &amp; MEDICAL INVOICE</span>
   </div>
 
   <div class="content">
@@ -355,94 +432,28 @@
     <!-- BILL TO / DELIVER TO -->
     <div class="parties">
       <div class="party-box">
-        <div class="party-title">
-          <span class="party-dot"></span> Bill To
-        </div>
+        <div class="party-title"><span class="party-dot"></span> Bill To</div>
         <div class="party-content">
           <strong>Renan Billion</strong>
           46/197 Wells Road, Chelsea Heights VIC 3196<br>
-          <!-- {{billTo.email}} — render only if exists -->
           renanjoseph.billorn@gmail.com<br>
-          <!-- {{billTo.phone}} — render only if exists -->
           0400 000 000
         </div>
       </div>
       <div class="party-box">
-        <div class="party-title">
-          <span class="party-dot"></span> Deliver To
-        </div>
+        <div class="party-title"><span class="party-dot"></span> Deliver To</div>
         <div class="party-content">
           <strong>46/197 Wells Road, Chelsea Heights,<br>Victoria, Melbourne VIC 3000</strong><br>
-          <!-- {{deliverTo.phone}} — render only if exists -->
           0400 000 000
         </div>
       </div>
     </div>
 
-    <!-- SERVICE DETAILS BOX — AGED CARE -->
-    <!-- Swap sidebar-text and service-box-title text for NDIS variant -->
+    <!-- SERVICE BOX — swapped by JS -->
     <div class="service-box">
-      <div class="service-box-title">Aged Care Billing Information</div>
-      <!-- NDIS variant: replace title with "NDIS Service Details" -->
-      <div class="service-fields">
-
-        <!-- SHARED / AGED CARE fields -->
-        <div>
-          <div class="service-field-label">Client Name</div>
-          <div class="service-field-value">Renan Billion</div>
-        </div>
-        <div>
-          <div class="service-field-label">Client ID</div>
-          <div class="service-field-value">4300000001</div>
-        </div>
-        <div>
-          <div class="service-field-label">Care Level</div>
-          <div class="service-field-value">Level 2</div>
-        </div>
-
-        <!-- Aged Care: {{agedCare.fundingType}} — render only if exists -->
-        <div>
-          <div class="service-field-label">Funding Type</div>
-          <div class="service-field-value">HCP — Home Care Package</div>
-        </div>
-
-        <!-- Aged Care: {{agedCare.providerName}} — render only if exists -->
-        <div>
-          <div class="service-field-label">Provider Name</div>
-          <div class="service-field-value">My Aged Care</div>
-        </div>
-
-        <!-- Aged Care: {{agedCare.reference}} — dynamic (PO / DVA / SWEP etc.) — render only if exists -->
-        <div>
-          <div class="service-field-label">Reference</div>
-          <div class="service-field-value">Self-Managed / Direct</div>
-        </div>
-
-        <!-- ── NDIS-ONLY fields (conditionally rendered when invoice type = ndis) ── -->
-        <!-- {{ndis.fundingType}} — always show for NDIS -->
-        <!--
-        <div>
-          <div class="service-field-label">Funding Type</div>
-          <div class="service-field-value">{{ndis.fundingType}}</div>
-        </div>
-        -->
-
-        <!-- {{ndis.reference}} — render only if exists -->
-        <!--
-        <div>
-          <div class="service-field-label">Reference</div>
-          <div class="service-field-value">{{ndis.reference}}</div>
-        </div>
-        -->
-
-        <!-- Plan Manager — render ONLY if ndis.fundingType === 'plan_managed' -->
-        <!--
-        <div>
-          <div class="service-field-label">Plan Manager</div>
-          <div class="service-field-value">{{ndis.planManager}}</div>
-        </div>
-        -->
-
+      <div class="service-box-title" id="serviceBoxTitle">Aged Care Billing Information</div>
+      <div class="service-fields" id="serviceFields">
+        <!-- populated by JS -->
       </div>
     </div>
 
@@ -451,18 +462,14 @@
       <table>
         <thead>
           <tr>
-            <th class="product-img-cell">Product</th>
             <th>Description</th>
             <th class="right">QTY</th>
-            <th class="right">Unit</th>
+            <th class="right">Unit Price</th>
             <th class="right">Total</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td class="product-img-cell">
-              <div class="product-img-placeholder"></div>
-            </td>
             <td>
               <div class="desc-name">30" Safety Bed Rail</div>
               <div class="desc-sku">SKU: N50081</div>
@@ -478,19 +485,14 @@
     <!-- TOTALS -->
     <div class="totals-wrap">
       <div class="totals-table">
-
-        <!-- {{reference}} — render only if exists -->
-        <div class="totals-row">
-          <span class="label">Reference</span>
+        <div class="totals-row" id="referenceRow">
+          <span class="label" id="referenceLabel">Reference</span>
           <span class="value">Self-Managed / Direct</span>
         </div>
-
-        <!-- {{poNumber}} — render only if exists -->
         <div class="totals-row">
           <span class="label">PO Number</span>
           <span class="value">PO-2026-0042</span>
         </div>
-
         <div class="totals-row">
           <span class="label">Subtotal</span>
           <span class="value">$259.00</span>
@@ -507,19 +509,17 @@
       </div>
     </div>
 
-    <!-- PAYMENT DETAILS — {{bankName}}, {{accountName}}, {{bsb}}, {{accountNumber}} / {{paymentLink}} -->
-    <div class="biz-details" style="margin-top: 28px;">
+    <!-- PAYMENT DETAILS -->
+    <div class="payment-details">
       <strong>Payment Details</strong>
       Bank: Commonwealth Bank<br>
       Account Name: Aged Care &amp; Medical Pty Ltd<br>
       BSB: 062-000<br>
-      Account Number: 1234 5678<br>
-      <!-- {{paymentLink}} — render as alternative to bank details only if exists -->
-      <!-- Pay Online: <a href="{{paymentLink}}" style="color:var(--accent);">{{paymentLink}}</a> -->
+      Account Number: 1234 5678
     </div>
 
-    <!-- NOTES — {{notes}} — render only if exists -->
-    <div class="footer" style="margin-top: 20px; border-top: none; padding-top: 0; font-style: normal; color: var(--text-mid);">
+    <!-- NOTES -->
+    <div class="notes-line">
       Please allow 2–3 business days for delivery. For enquiries contact support@agedcaremedical.com.au
     </div>
 
@@ -530,5 +530,68 @@
 
   </div>
 </div>
+
+<script>
+  const THEMES = {
+    aged_care: {
+      accent:        '#DC4E00',
+      sidebarText:   'AGED CARE &amp; MEDICAL INVOICE',
+      serviceTitle:  'Aged Care Billing Information',
+      referenceLabel:'Reference',
+      fields: [
+        { label: 'Client Name',   value: 'Renan Billion' },
+        { label: 'Client ID',     value: '4300000001' },
+        { label: 'Care Level',    value: 'Level 2' },
+        { label: 'Funding Type',  value: 'HCP — Home Care Package' },
+        { label: 'Provider Name', value: 'My Aged Care' },
+        { label: 'Reference',     value: 'Self-Managed / Direct' },
+      ]
+    },
+    ndis: {
+      accent:        '#84164E',
+      sidebarText:   'NDIS INVOICE',
+      serviceTitle:  'NDIS Service Details',
+      referenceLabel:'NDIS Reference',
+      fields: [
+        { label: 'Participant Name',  value: 'Renan Billion' },
+        { label: 'NDIS Number',       value: '430 000 0001' },
+        { label: 'Support Category',  value: 'Assistive Technology' },
+        { label: 'Funding Type',      value: 'Plan Managed' },
+        { label: 'Plan Manager',      value: 'My Plan Manager' },
+        { label: 'Reference',         value: 'PO-2026-0042' },
+      ]
+    }
+  };
+
+  function setType(type) {
+    const theme = THEMES[type];
+
+    // ── CSS variable (accent colour propagates everywhere) ──
+    document.documentElement.style.setProperty('--accent', theme.accent);
+
+    // ── Sidebar ──
+    document.getElementById('sidebarText').innerHTML = theme.sidebarText;
+
+    // ── Service box ──
+    document.getElementById('serviceBoxTitle').textContent = theme.serviceTitle;
+    const fieldsEl = document.getElementById('serviceFields');
+    fieldsEl.innerHTML = theme.fields.map(f => `
+      <div>
+        <div class="service-field-label">${f.label}</div>
+        <div class="service-field-value">${f.value}</div>
+      </div>
+    `).join('');
+
+    // ── Totals reference label ──
+    document.getElementById('referenceLabel').textContent = theme.referenceLabel;
+
+    // ── Toggle active button state ──
+    document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.${type.replace('_','-')}-btn`).classList.add('active');
+  }
+
+  // Initialise with Aged Care fields on load
+  setType('aged_care');
+</script>
 </body>
 </html>
