@@ -3,41 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tax Invoice {{invoiceNumber}}</title>
+  <title>Tax Invoice #D1175 — Aged Care Preview</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Arbutus+Slab&family=Montserrat:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap');
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --accent:       {{#if isNdis}}#8e1b52{{else}}#e65c00{{/if}};
-      --accent-light: {{#if isNdis}}#f9eef4{{else}}#fff4ee{{/if}};
+      --accent:       #DC4E00;
+      --accent-light: #fff4ee;
       --grey-bg:      #f4f4f4;
       --grey-line:    #e0e0e0;
+      --grey-core:    #696969;
+      --grey-hi:      #929487;
       --text-dark:    #1a1a1a;
-      --text-mid:     #555;
-      --text-light:   #888;
-      --sidebar-w:    68px;
+      --text-mid:     #696969;
+      --text-light:   #929487;
+      --sidebar-w:    48px;
     }
+    .page.ndis { --accent: #84164E; --accent-light: #f9eef4; }
 
     html, body {
       height: 100%;
       background: #eee;
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Poppins', sans-serif;
       color: var(--text-dark);
     }
 
-    /* ── PAGE WRAPPER ── */
     .page {
       position: relative;
-      width: 794px;   /* A4 @ 96dpi */
+      width: 794px;
       min-height: 1123px;
       margin: 32px auto;
       background: #fff;
       display: flex;
     }
 
-    /* ── LEFT SIDEBAR ── */
     .sidebar {
       flex-shrink: 0;
       width: var(--sidebar-w);
@@ -51,16 +52,15 @@
       writing-mode: vertical-rl;
       transform: rotate(180deg);
       color: #fff;
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Montserrat', sans-serif;
       font-weight: 700;
-      font-size: 11.5px;
+      font-size: 10px;
       letter-spacing: 3px;
       text-transform: uppercase;
       white-space: nowrap;
       opacity: 0.92;
     }
 
-    /* ── MAIN CONTENT ── */
     .content {
       flex: 1;
       display: flex;
@@ -68,7 +68,6 @@
       padding: 36px 40px 40px;
     }
 
-    /* ── HEADER ── */
     .header {
       display: flex;
       justify-content: space-between;
@@ -76,47 +75,20 @@
       padding-bottom: 28px;
       border-bottom: 1.5px solid var(--grey-line);
     }
-
-    .logo-area {}
-    .logo-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 28px;
-      line-height: 1.15;
-      color: var(--accent);
-      letter-spacing: -0.5px;
-    }
-    .logo-name span {
-      display: block;
-      font-size: 28px;
-    }
-    .logo-tagline {
-      margin-top: 6px;
-      font-size: 11px;
-      color: var(--text-mid);
-      font-style: italic;
-      letter-spacing: 0.3px;
-    }
-    .logo-badges {
-      margin-top: 8px;
+    .logo-area {
       display: flex;
-      gap: 6px;
+      flex-direction: column;
+      justify-content: flex-start;
     }
-    .badge {
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 20px;
-      border: 1.5px solid var(--accent);
-      color: var(--accent);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
+    .logo-area img {
+      width: 180px;
+      height: auto;
+      display: block;
     }
-
-    .invoice-meta {
-      text-align: right;
-    }
+    .invoice-meta { text-align: right; }
     .invoice-title {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
       font-size: 38px;
       letter-spacing: -1px;
       color: var(--text-dark);
@@ -128,12 +100,14 @@
       color: var(--accent);
       margin-top: 4px;
       letter-spacing: 0.5px;
+      font-family: 'Montserrat', sans-serif;
     }
     .biz-details {
       margin-top: 10px;
       font-size: 11px;
       color: var(--text-mid);
       line-height: 1.7;
+      font-family: 'Poppins', sans-serif;
     }
     .biz-details strong {
       display: block;
@@ -142,7 +116,6 @@
       color: var(--text-dark);
     }
 
-    /* ── DATE BAR ── */
     .date-bar {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -164,22 +137,22 @@
       text-transform: uppercase;
       letter-spacing: 1.2px;
       color: var(--text-light);
+      font-family: 'Montserrat', sans-serif;
     }
     .date-value {
       font-size: 15px;
       font-weight: 700;
       color: var(--text-dark);
       margin-top: 4px;
+      font-family: 'Montserrat', sans-serif;
     }
 
-    /* ── BILL TO / DELIVER TO ── */
     .parties {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 24px;
       margin-top: 28px;
     }
-    .party-box {}
     .party-title {
       display: flex;
       align-items: center;
@@ -190,6 +163,7 @@
       letter-spacing: 1.5px;
       color: var(--text-dark);
       margin-bottom: 8px;
+      font-family: 'Montserrat', sans-serif;
     }
     .party-dot {
       width: 10px;
@@ -212,7 +186,6 @@
       margin-bottom: 2px;
     }
 
-    /* ── SERVICE DETAILS BOX ── */
     .service-box {
       margin-top: 24px;
       background: var(--grey-bg);
@@ -226,6 +199,7 @@
       letter-spacing: 1.5px;
       color: var(--text-light);
       margin-bottom: 10px;
+      font-family: 'Montserrat', sans-serif;
     }
     .service-fields {
       display: grid;
@@ -239,25 +213,18 @@
       letter-spacing: 1px;
       color: var(--text-light);
       margin-bottom: 3px;
+      font-family: 'Montserrat', sans-serif;
     }
     .service-field-value {
       font-size: 13px;
       font-weight: 700;
       color: var(--text-dark);
+      font-family: 'Montserrat', sans-serif;
     }
 
-    /* ── PRODUCT TABLE ── */
-    .table-wrap {
-      margin-top: 28px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    }
-    thead tr {
-      border-bottom: 2px solid var(--grey-line);
-    }
+    .table-wrap { margin-top: 28px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead tr { border-bottom: 2px solid var(--grey-line); }
     thead th {
       padding: 10px 12px;
       text-align: left;
@@ -266,14 +233,11 @@
       text-transform: uppercase;
       letter-spacing: 1.2px;
       color: var(--text-light);
+      font-family: 'Montserrat', sans-serif;
     }
     thead th.right { text-align: right; }
-
-    tbody tr {
-      border-bottom: 1px solid var(--grey-line);
-    }
+    tbody tr { border-bottom: 1px solid var(--grey-line); }
     tbody tr:last-child { border-bottom: none; }
-
     tbody td {
       padding: 14px 12px;
       vertical-align: middle;
@@ -281,34 +245,25 @@
       font-size: 12.5px;
     }
     td.right { text-align: right; }
-
-    .product-img-cell {
-      width: 72px;
-    }
+    .product-img-cell { width: 64px; }
     .product-img-cell img,
     .product-img-placeholder {
-      width: 60px;
-      height: 60px;
+      width: 44px;
+      height: 70px;
       object-fit: cover;
-      border-radius: 6px;
+      border-radius: 4px;
       display: block;
     }
-    .product-img-placeholder {
-      background: var(--accent);
-    }
+    .product-img-placeholder { background: var(--accent); }
+    .desc-name { font-weight: 600; color: var(--text-dark); }
+    .desc-sku  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
 
-    .desc-name  { font-weight: 600; color: var(--text-dark); }
-    .desc-sku   { font-size: 11px;  color: var(--text-light); margin-top: 2px; }
-
-    /* ── TOTALS ── */
     .totals-wrap {
       margin-top: 24px;
       display: flex;
       justify-content: flex-end;
     }
-    .totals-table {
-      width: 260px;
-    }
+    .totals-table { width: 260px; }
     .totals-row {
       display: flex;
       justify-content: space-between;
@@ -323,21 +278,20 @@
       border-top: 1.5px solid var(--grey-line);
       margin: 6px 0;
     }
-    .totals-row.grand {
-      padding: 10px 0 0;
-    }
+    .totals-row.grand { padding: 10px 0 0; }
     .totals-row.grand .label {
       font-size: 14px;
       font-weight: 700;
       color: var(--text-dark);
+      font-family: 'Montserrat', sans-serif;
     }
     .totals-row.grand .value {
       font-size: 16px;
       font-weight: 700;
       color: var(--accent);
+      font-family: 'Montserrat', sans-serif;
     }
 
-    /* ── FOOTER ── */
     .footer {
       margin-top: auto;
       padding-top: 32px;
@@ -349,7 +303,6 @@
       letter-spacing: 0.2px;
     }
 
-    /* ── PRINT ── */
     @media print {
       body { background: #fff; }
       .page { margin: 0; box-shadow: none; width: 100%; }
@@ -361,37 +314,24 @@
 
   <!-- LEFT SIDEBAR -->
   <div class="sidebar">
-    <span class="sidebar-text">
-      {{#if isNdis}}NDIS INVOICE{{else}}AGED CARE &amp; MEDICAL INVOICE{{/if}}
-    </span>
+    <span class="sidebar-text">AGED CARE &amp; MEDICAL INVOICE</span>
   </div>
 
-  <!-- MAIN CONTENT -->
   <div class="content">
 
     <!-- HEADER -->
     <div class="header">
       <div class="logo-area">
-        <div class="logo-name">
-          <span>{{storeName}}</span>
-        </div>
-        {{#if storeTagline}}
-        <div class="logo-tagline">'{{storeTagline}}'</div>
-        {{/if}}
-        <div class="logo-badges">
-          {{#if isNdis}}<span class="badge">NDIS</span>{{/if}}
-          {{#if isAgedCare}}<span class="badge">Aged Care</span>{{/if}}
-        </div>
+        <img src="https://cdn.shopify.com/s/files/1/0363/8955/2187/files/ACM_header_logo.png?v=1776935561" alt="Aged Care &amp; Medical" />
       </div>
-
       <div class="invoice-meta">
         <div class="invoice-title">TAX INVOICE</div>
-        <div class="invoice-num">#{{invoiceNumber}}</div>
+        <div class="invoice-num">#D1175</div>
         <div class="biz-details">
-          <strong>{{businessName}}</strong>
-          ABN: {{abn}}<br>
-          Phone: {{phone}}<br>
-          {{address}}
+          <strong>Aged Care &amp; Medical</strong>
+          ABN: 54 156 589 244<br>
+          Phone: (356) 003 830<br>
+          46/197 Wells Road, Chelsea Heights VIC 3196
         </div>
       </div>
     </div>
@@ -400,15 +340,15 @@
     <div class="date-bar">
       <div class="date-bar-item">
         <div class="date-label">Issued Date</div>
-        <div class="date-value">{{issuedDate}}</div>
+        <div class="date-value">23 April 2026</div>
       </div>
       <div class="date-bar-item">
         <div class="date-label">Due Date</div>
-        <div class="date-value">{{dueDate}}</div>
+        <div class="date-value">07 May 2026</div>
       </div>
       <div class="date-bar-item">
         <div class="date-label">Payment Terms</div>
-        <div class="date-value">{{paymentTerms}}</div>
+        <div class="date-value">14 Days</div>
       </div>
     </div>
 
@@ -419,9 +359,12 @@
           <span class="party-dot"></span> Bill To
         </div>
         <div class="party-content">
-          <strong>{{billTo.name}}</strong>
-          {{billTo.contactDetails}}<br>
-          {{billTo.address}}
+          <strong>Renan Billion</strong>
+          46/197 Wells Road, Chelsea Heights VIC 3196<br>
+          <!-- {{billTo.email}} — render only if exists -->
+          renanjoseph.billorn@gmail.com<br>
+          <!-- {{billTo.phone}} — render only if exists -->
+          0400 000 000
         </div>
       </div>
       <div class="party-box">
@@ -429,48 +372,78 @@
           <span class="party-dot"></span> Deliver To
         </div>
         <div class="party-content">
-          <strong>{{deliverTo.name}}</strong>
-          {{deliverTo.contactDetails}}<br>
-          {{deliverTo.address}}
+          <strong>46/197 Wells Road, Chelsea Heights,<br>Victoria, Melbourne VIC 3000</strong><br>
+          <!-- {{deliverTo.phone}} — render only if exists -->
+          0400 000 000
         </div>
       </div>
     </div>
 
-    <!-- SERVICE DETAILS BOX -->
+    <!-- SERVICE DETAILS BOX — AGED CARE -->
+    <!-- Swap sidebar-text and service-box-title text for NDIS variant -->
     <div class="service-box">
-      {{#if isNdis}}
-        <div class="service-box-title">NDIS Service Details</div>
-        <div class="service-fields">
-          <div>
-            <div class="service-field-label">Name</div>
-            <div class="service-field-value">{{ndis.participantName}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">NDIS Number</div>
-            <div class="service-field-value">{{ndis.ndisNumber}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">Plan Manager</div>
-            <div class="service-field-value">{{ndis.planManager}}</div>
-          </div>
+      <div class="service-box-title">Aged Care Billing Information</div>
+      <!-- NDIS variant: replace title with "NDIS Service Details" -->
+      <div class="service-fields">
+
+        <!-- SHARED / AGED CARE fields -->
+        <div>
+          <div class="service-field-label">Client Name</div>
+          <div class="service-field-value">Renan Billion</div>
         </div>
-      {{else}}
-        <div class="service-box-title">Aged Care Billing Information</div>
-        <div class="service-fields">
-          <div>
-            <div class="service-field-label">Client Name</div>
-            <div class="service-field-value">{{agedCare.clientName}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">Client ID</div>
-            <div class="service-field-value">{{agedCare.clientId}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">Care Level</div>
-            <div class="service-field-value">{{agedCare.careLevel}}</div>
-          </div>
+        <div>
+          <div class="service-field-label">Client ID</div>
+          <div class="service-field-value">4300000001</div>
         </div>
-      {{/if}}
+        <div>
+          <div class="service-field-label">Care Level</div>
+          <div class="service-field-value">Level 2</div>
+        </div>
+
+        <!-- Aged Care: {{agedCare.fundingType}} — render only if exists -->
+        <div>
+          <div class="service-field-label">Funding Type</div>
+          <div class="service-field-value">HCP — Home Care Package</div>
+        </div>
+
+        <!-- Aged Care: {{agedCare.providerName}} — render only if exists -->
+        <div>
+          <div class="service-field-label">Provider Name</div>
+          <div class="service-field-value">My Aged Care</div>
+        </div>
+
+        <!-- Aged Care: {{agedCare.reference}} — dynamic (PO / DVA / SWEP etc.) — render only if exists -->
+        <div>
+          <div class="service-field-label">Reference</div>
+          <div class="service-field-value">Self-Managed / Direct</div>
+        </div>
+
+        <!-- ── NDIS-ONLY fields (conditionally rendered when invoice type = ndis) ── -->
+        <!-- {{ndis.fundingType}} — always show for NDIS -->
+        <!--
+        <div>
+          <div class="service-field-label">Funding Type</div>
+          <div class="service-field-value">{{ndis.fundingType}}</div>
+        </div>
+        -->
+
+        <!-- {{ndis.reference}} — render only if exists -->
+        <!--
+        <div>
+          <div class="service-field-label">Reference</div>
+          <div class="service-field-value">{{ndis.reference}}</div>
+        </div>
+        -->
+
+        <!-- Plan Manager — render ONLY if ndis.fundingType === 'plan_managed' -->
+        <!--
+        <div>
+          <div class="service-field-label">Plan Manager</div>
+          <div class="service-field-value">{{ndis.planManager}}</div>
+        </div>
+        -->
+
+      </div>
     </div>
 
     <!-- PRODUCT TABLE -->
@@ -486,24 +459,18 @@
           </tr>
         </thead>
         <tbody>
-          {{#each lineItems}}
           <tr>
             <td class="product-img-cell">
-              {{#if this.image}}
-                <img src="{{this.image}}" alt="{{this.name}}" />
-              {{else}}
-                <div class="product-img-placeholder"></div>
-              {{/if}}
+              <div class="product-img-placeholder"></div>
             </td>
             <td>
-              <div class="desc-name">{{this.name}}</div>
-              <div class="desc-sku">{{this.sku}}</div>
+              <div class="desc-name">30" Safety Bed Rail</div>
+              <div class="desc-sku">SKU: N50081</div>
             </td>
-            <td class="right">{{this.quantity}}</td>
-            <td class="right">{{this.unitPrice}}</td>
-            <td class="right">{{this.total}}</td>
+            <td class="right">1</td>
+            <td class="right">$259.00</td>
+            <td class="right">$259.00</td>
           </tr>
-          {{/each}}
         </tbody>
       </table>
     </div>
@@ -511,28 +478,57 @@
     <!-- TOTALS -->
     <div class="totals-wrap">
       <div class="totals-table">
+
+        <!-- {{reference}} — render only if exists -->
+        <div class="totals-row">
+          <span class="label">Reference</span>
+          <span class="value">Self-Managed / Direct</span>
+        </div>
+
+        <!-- {{poNumber}} — render only if exists -->
+        <div class="totals-row">
+          <span class="label">PO Number</span>
+          <span class="value">PO-2026-0042</span>
+        </div>
+
         <div class="totals-row">
           <span class="label">Subtotal</span>
-          <span class="value">{{subtotal}}</span>
+          <span class="value">$259.00</span>
         </div>
         <div class="totals-row">
           <span class="label">GST (10%)</span>
-          <span class="value">{{gstAmount}}</span>
+          <span class="value">$23.55</span>
         </div>
         <hr class="totals-divider" />
         <div class="totals-row grand">
           <span class="label">Total Due</span>
-          <span class="value">{{totalDue}} AUD</span>
+          <span class="value">$259.00 AUD</span>
         </div>
       </div>
     </div>
 
-    <!-- FOOTER -->
-    <div class="footer">
-      Thank you for choosing {{storeName}}. Please quote invoice #{{invoiceNumber}} for all payments.
+    <!-- PAYMENT DETAILS — {{bankName}}, {{accountName}}, {{bsb}}, {{accountNumber}} / {{paymentLink}} -->
+    <div class="biz-details" style="margin-top: 28px;">
+      <strong>Payment Details</strong>
+      Bank: Commonwealth Bank<br>
+      Account Name: Aged Care &amp; Medical Pty Ltd<br>
+      BSB: 062-000<br>
+      Account Number: 1234 5678<br>
+      <!-- {{paymentLink}} — render as alternative to bank details only if exists -->
+      <!-- Pay Online: <a href="{{paymentLink}}" style="color:var(--accent);">{{paymentLink}}</a> -->
     </div>
 
-  </div><!-- /.content -->
-</div><!-- /.page -->
+    <!-- NOTES — {{notes}} — render only if exists -->
+    <div class="footer" style="margin-top: 20px; border-top: none; padding-top: 0; font-style: normal; color: var(--text-mid);">
+      Please allow 2–3 business days for delivery. For enquiries contact support@agedcaremedical.com.au
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      Thank you for choosing Aged Care &amp; Medical. Please quote invoice #D1175 for all payments.
+    </div>
+
+  </div>
+</div>
 </body>
 </html>
