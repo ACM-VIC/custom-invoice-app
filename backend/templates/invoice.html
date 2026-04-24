@@ -9,15 +9,7 @@
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
-      --accent: #2a7a6f;
-      --sidebar-w: 42px;
-      --grey-bg: #f5f5f5;
-      --grey-line: #e0e0e0;
-      --text-dark: #1a1a1a;
-      --text-mid: #555;
-      --text-light: #999;
-    }
+
 
     html, body {
       min-height: 100%;
@@ -26,6 +18,7 @@
       color: var(--text-dark);
     }
 
+    /* ── PAGE ── */
     .page {
       position: relative;
       width: 794px;
@@ -36,7 +29,7 @@
       box-shadow: 0 8px 40px rgba(0,0,0,0.12);
     }
 
-    /* ── LEFT SIDEBAR — flushed to left edge ── */
+    /* ── LEFT SIDEBAR ── */
     .sidebar {
       flex-shrink: 0;
       width: var(--sidebar-w);
@@ -46,14 +39,11 @@
       justify-content: center;
       overflow: hidden;
       position: relative;
-      /* Ensure it sits flush — no margin/offset */
-      align-self: stretch;
     }
-    /* Dark inner-shadow strip moved to the RIGHT edge of the sidebar */
-    .sidebar::after {
+    .sidebar::before {
       content: '';
       position: absolute;
-      right: 0; top: 0; bottom: 0;
+      left: 0; top: 0; bottom: 0;
       width: 6px;
       background: rgba(0,0,0,0.18);
     }
@@ -78,6 +68,7 @@
       padding: 36px 40px 40px;
     }
 
+    /* ── HEADER ── */
     .header {
       display: flex;
       justify-content: space-between;
@@ -116,6 +107,7 @@
       color: var(--text-dark);
     }
 
+    /* ── DATE BAR ── */
     .date-bar {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -146,6 +138,7 @@
       font-family: 'Montserrat', sans-serif;
     }
 
+    /* ── PARTIES ── */
     .parties {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -184,6 +177,7 @@
       margin-bottom: 2px;
     }
 
+    /* ── SERVICE BOX ── */
     .service-box {
       margin-top: 24px;
       background: var(--grey-bg);
@@ -220,6 +214,7 @@
       font-family: 'Montserrat', sans-serif;
     }
 
+    /* ── TABLE ── */
     .table-wrap { margin-top: 28px; }
     table { width: 100%; border-collapse: collapse; }
     thead tr { border-bottom: 2px solid var(--grey-line); }
@@ -242,6 +237,7 @@
     .desc-sku     { font-size: 11px; color: var(--text-light); margin-top: 2px; }
     .desc-variant { font-size: 11px; color: var(--text-mid);   margin-top: 1px; }
 
+    /* ── TOTALS ── */
     .totals-wrap { margin-top: 24px; display: flex; justify-content: flex-end; }
     .totals-table { width: 260px; }
     .totals-row {
@@ -265,7 +261,14 @@
       color: var(--accent);
       font-family: 'Montserrat', sans-serif;
     }
+    .gst-note {
+      font-size: 11px;
+      color: var(--text-light);
+      text-align: right;
+      margin-top: 6px;
+    }
 
+    /* ── PAYMENT / NOTES / FOOTER ── */
     .payment-details {
       margin-top: 28px;
       font-size: 11px;
@@ -278,6 +281,11 @@
       font-weight: 600;
       color: var(--text-dark);
       margin-bottom: 4px;
+    }
+    .notes-line {
+      margin-top: 20px;
+      font-size: 11px;
+      color: var(--text-mid);
     }
     .footer {
       margin-top: auto;
@@ -302,10 +310,14 @@
 
   <!-- SIDEBAR -->
   <div class="sidebar">
-    <span class="sidebar-text">AGED CARE &amp; MEDICAL INVOICE</span>
+    <span class="sidebar-text">
+      {{#if isNdis}}NDIS INVOICE{{else}}AGED CARE &amp; MEDICAL INVOICE{{/if}}
+    </span>
   </div>
 
   <div class="content">
+
+    <!-- HEADER -->
     <div class="header">
       <div class="logo-area">
         <img src="https://cdn.shopify.com/s/files/1/0363/8955/2187/files/ACM_header_logo.png?v=1776935561"
@@ -313,81 +325,110 @@
       </div>
       <div class="invoice-meta">
         <div class="invoice-title">TAX INVOICE</div>
-        <div class="invoice-num">#INV-00123</div>
+        <div class="invoice-num">{{invoiceNumber}}</div>
         <div class="biz-details">
-          <strong>Aged Care &amp; Medical Pty Ltd</strong>
-          123 Health St, Sydney NSW 2000<br>
-          ABN: 12 345 678 901<br>
-          Phone: (02) 9000 0000<br>
-          billing@acmedical.com.au
+          <strong>{{storeName}}</strong>
+          {{#if storeAddress}}{{storeAddress}}<br>{{/if}}
+          ABN: {{storeAbn}}<br>
+          {{#if storePhone}}Phone: {{storePhone}}<br>{{/if}}
+          {{#if storeEmail}}{{storeEmail}}{{/if}}
         </div>
       </div>
     </div>
 
+    <!-- DATE BAR -->
     <div class="date-bar">
       <div class="date-bar-item">
         <div class="date-label">Issued Date</div>
-        <div class="date-value">24 Apr 2026</div>
+        <div class="date-value">{{invoiceDate}}</div>
       </div>
       <div class="date-bar-item">
         <div class="date-label">Due Date</div>
-        <div class="date-value">08 May 2026</div>
+        <div class="date-value">{{dueDate}}</div>
       </div>
       <div class="date-bar-item">
         <div class="date-label">Payment Terms</div>
-        <div class="date-value">Net 14</div>
+        <div class="date-value">{{paymentTerms}}</div>
       </div>
     </div>
 
+    <!-- BILL TO / DELIVER TO -->
     <div class="parties">
       <div class="party-box">
         <div class="party-title"><span class="party-dot"></span> Bill To</div>
         <div class="party-content">
-          <strong>Margaret Thompson</strong>
-          42 Rosewood Ave, Melbourne VIC 3000<br>
-          mthompson@email.com<br>
-          0412 345 678
+          <strong>{{billTo.name}}</strong>
+          {{#if billTo.address}}{{billTo.address}}<br>{{/if}}
+          {{#if billTo.email}}{{billTo.email}}<br>{{/if}}
+          {{#if billTo.phone}}{{billTo.phone}}{{/if}}
         </div>
       </div>
       <div class="party-box">
         <div class="party-title"><span class="party-dot"></span> Deliver To</div>
         <div class="party-content">
-          <strong>42 Rosewood Ave, Melbourne VIC 3000</strong>
-          <br>0412 345 678
+          <strong>{{deliverTo.address}}</strong>
+          {{#if deliverTo.phone}}<br>{{deliverTo.phone}}{{/if}}
         </div>
       </div>
     </div>
 
+    <!-- SERVICE BOX — rendered server-side by Handlebars, no JS needed -->
     <div class="service-box">
-      <div class="service-box-title">Aged Care Billing Information</div>
+      <div class="service-box-title">
+        {{#if isNdis}}NDIS Service Details{{else}}Aged Care Billing Information{{/if}}
+      </div>
       <div class="service-fields">
-        <div>
-          <div class="service-field-label">Client Name</div>
-          <div class="service-field-value">Margaret Thompson</div>
-        </div>
-        <div>
-          <div class="service-field-label">Client ID</div>
-          <div class="service-field-value">AC-00456</div>
-        </div>
-        <div>
-          <div class="service-field-label">Care Level</div>
-          <div class="service-field-value">Level 3</div>
-        </div>
-        <div>
-          <div class="service-field-label">Funding Type</div>
-          <div class="service-field-value">HCP</div>
-        </div>
-        <div>
-          <div class="service-field-label">Provider Name</div>
-          <div class="service-field-value">CareConnect</div>
-        </div>
-        <div>
-          <div class="service-field-label">Reference</div>
-          <div class="service-field-value">PO-2026-088</div>
-        </div>
+        {{#if isNdis}}
+          <div>
+            <div class="service-field-label">Participant Name</div>
+            <div class="service-field-value">{{billTo.name}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">NDIS Number</div>
+            <div class="service-field-value">{{ndis.number}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Funding Type</div>
+            <div class="service-field-value">{{ndis.fundingType}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Plan Manager</div>
+            <div class="service-field-value">{{ndis.providerName}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Provider Email</div>
+            <div class="service-field-value">{{ndis.providerEmail}}</div>
+          </div>
+        {{else}}
+          <div>
+            <div class="service-field-label">Client Name</div>
+            <div class="service-field-value">{{billTo.name}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Client ID</div>
+            <div class="service-field-value">{{agedCare.clientId}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Care Level</div>
+            <div class="service-field-value">{{agedCare.packageLevel}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Funding Type</div>
+            <div class="service-field-value">{{agedCare.fundingType}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Provider Name</div>
+            <div class="service-field-value">{{agedCare.providerName}}</div>
+          </div>
+          <div>
+            <div class="service-field-label">Reference</div>
+            <div class="service-field-value">{{reference}}</div>
+          </div>
+        {{/if}}
       </div>
     </div>
 
+    <!-- PRODUCT TABLE -->
     <div class="table-wrap">
       <table>
         <thead>
@@ -399,67 +440,81 @@
           </tr>
         </thead>
         <tbody>
+          {{#each lineItems}}
           <tr>
             <td>
-              <div class="desc-name">Compression Stockings Class II</div>
-              <div class="desc-variant">Beige / Medium</div>
-              <div class="desc-sku">SKU: CS-CLASS2-BEI-M</div>
+              <div class="desc-name">{{this.title}}</div>
+              {{#if this.variant}}<div class="desc-variant">{{this.variant}}</div>{{/if}}
+              {{#if this.sku}}<div class="desc-sku">SKU: {{this.sku}}</div>{{/if}}
             </td>
-            <td class="right">2</td>
-            <td class="right">$54.50</td>
-            <td class="right">$109.00</td>
+            <td class="right">{{this.quantity}}</td>
+            <td class="right">{{this.price}}</td>
+            <td class="right">{{this.total}}</td>
           </tr>
-          <tr>
-            <td>
-              <div class="desc-name">Adjustable Walker — Aluminium</div>
-              <div class="desc-sku">SKU: WALK-ALU-ADJ</div>
-            </td>
-            <td class="right">1</td>
-            <td class="right">$189.00</td>
-            <td class="right">$189.00</td>
-          </tr>
-          <tr>
-            <td>
-              <div class="desc-name">Continence Pads — Night (Pack of 20)</div>
-              <div class="desc-sku">SKU: PAD-NIGHT-20</div>
-            </td>
-            <td class="right">3</td>
-            <td class="right">$28.00</td>
-            <td class="right">$84.00</td>
-          </tr>
+          {{/each}}
         </tbody>
       </table>
     </div>
 
+    <!-- TOTALS -->
     <div class="totals-wrap">
       <div class="totals-table">
+        {{#if reference}}
+        <div class="totals-row">
+          <span class="label">{{referenceLabel}}</span>
+          <span class="value">{{reference}}</span>
+        </div>
+        {{/if}}
+        {{#if poNumber}}
+        <div class="totals-row">
+          <span class="label">PO Number</span>
+          <span class="value">{{poNumber}}</span>
+        </div>
+        {{/if}}
         <div class="totals-row">
           <span class="label">Subtotal</span>
-          <span class="value">$347.27</span>
+          <span class="value">{{subtotal}}</span>
         </div>
         <div class="totals-row">
           <span class="label">GST (10%)</span>
-          <span class="value">$34.73</span>
+          <span class="value">{{tax}}</span>
         </div>
         <hr class="totals-divider" />
         <div class="totals-row grand">
           <span class="label">Total Due</span>
-          <span class="value">$382.00 AUD</span>
+          <span class="value">{{total}} AUD</span>
         </div>
       </div>
     </div>
 
+    {{#if gstNote}}
+    <div class="gst-note">{{gstNote}}</div>
+    {{/if}}
+
+    <!-- PAYMENT DETAILS -->
+    {{#if bankName}}
     <div class="payment-details">
       <strong>Payment Details</strong>
-      Bank: Commonwealth Bank<br>
-      Account Name: Aged Care &amp; Medical Pty Ltd<br>
-      BSB: 062-000<br>
-      Account Number: 1234 5678
+      Bank: {{bankName}}<br>
+      {{#if accountName}}Account Name: {{accountName}}<br>{{/if}}
+      {{#if bsb}}BSB: {{bsb}}<br>{{/if}}
+      {{#if accountNumber}}Account Number: {{accountNumber}}{{/if}}
+    </div>
+    {{/if}}
+
+    <!-- NOTES -->
+    {{#if customerNotes}}
+    <div class="notes-line">
+      <strong style="font-size:12px;font-weight:600;color:#1a1a1a;">Notes</strong><br>
+      {{customerNotes}}
+    </div>
+    {{/if}}
+
+    <!-- FOOTER -->
+    <div class="footer">
+      Thank you for choosing {{storeName}}. Please quote invoice {{invoiceNumber}} for all payments.
     </div>
 
-    <div class="footer">
-      Thank you for choosing Aged Care &amp; Medical. Please quote invoice #INV-00123 for all payments.
-    </div>
   </div>
 </div>
 
