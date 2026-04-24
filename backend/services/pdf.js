@@ -38,17 +38,14 @@ function formatLineItems(draftOrder) {
 // Resolve the Chrome executable that Puppeteer downloaded at startup
 function getChromePath() {
   try {
-    // This is the standard cache location Puppeteer uses on Linux
     const { executablePath } = require('puppeteer');
     return executablePath();
   } catch (e) {
-    // Fallback: walk the known cache directory
     const cacheDir = path.join(
       process.env.HOME || '/root',
       '.cache', 'puppeteer', 'chrome'
     );
     if (fs.existsSync(cacheDir)) {
-      // Find the first chrome binary inside the cache
       const entries = fs.readdirSync(cacheDir);
       for (const entry of entries) {
         const candidate = path.join(cacheDir, entry, 'chrome-linux64', 'chrome');
@@ -70,12 +67,73 @@ async function generateInvoice({ formType, formData, draftOrder }) {
   const tax      = parseFloat(draftOrder.total_tax       || 0).toFixed(2);
   const total    = parseFloat(draftOrder.total_price     || 0).toFixed(2);
 
+  // ── Resolve participant / client name ──────────────────────────────────────
+  const participantName =
+    formData.participant_full_name ||
+    `${formData.first_name || ''} ${formData.last_name || ''}`.trim();
+
+  // ── Bill-To block ──────────────────────────────────────────────────────────
+  // For plan-managed NDIS: bill to the Plan Manager.
+  // For all others: bill to the participant / client.
+  const isPlanManaged = formType === 'ndis' && formData.ndis_funding_type === 'plan_managed';
+
+  const billTo = isPlanManaged
+    ? {
+        name:    formData.plan_manager_company || '',
+        address: '',
+        email:   formData.plan_manager_email   || '',
+        phone:   formData.plan_manager_phone   || '',
+      }
+    : {
+        name:    participantName,
+        address: [
+          formData.address_line1,
+          `${formData.suburb || ''} ${formData.state || ''} ${formData.postcode || ''}`.trim(),
+        ].filter(Boolean).join(', '),
+        email:   formData.participant_email || formData.submitter_email || '',
+        phone:   formData.delivery_phone    || formData.submitter_phone || '',
+      };
+
+  // ── Deliver-To block ───────────────────────────────────────────────────────
+  const deliverTo = {
+    address: [
+      formData.address_line1,
+      `${formData.suburb || ''} ${formData.state || ''} ${formData.postcode || ''}`.trim(),
+      'Australia',
+    ].filter(Boolean).join(', '),
+    phone: formData.delivery_phone || '',
+  };
+
+  // ── NDIS-specific fields ───────────────────────────────────────────────────
+  const ndisData = formType === 'ndis' ? {
+    number:          formData.ndis_number          || '',
+    supportCategory: formData.support_category     || '',
+    fundingType:     (formData.ndis_funding_type   || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    providerName:    formData.plan_manager_company  || '',
+    providerEmail:   formData.plan_manager_email    || '',
+  } : {};
+
+  // ── Aged Care-specific fields ──────────────────────────────────────────────
+  const agedCareData = formType === 'aged_care' ? {
+    clientId:     formData.client_reference || '',
+    packageLevel: formData.package_level    || '',
+    fundingType:  (formData.ac_funding_type || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    providerName: formData.hcp_provider_name || formData.submitter_organisation || '',
+  } : {};
+
+  // ── Reference / PO ────────────────────────────────────────────────────────
+  const reference = formData.plan_manager_reference || formData.client_reference || '';
+  const poNumber  = formData.hcp_po_number || '';
+
   const templateData = {
+    // Store
     storeName:    STORE_NAME,
     storeAbn:     STORE_ABN,
     storeEmail:   STORE_EMAIL,
     storePhone:   STORE_PHONE,
     storeAddress: STORE_ADDRESS,
+
+    // Invoice meta
     invoiceNumber: draftOrder.name,
     invoiceDate:   new Date().toLocaleDateString('en-AU', {
                      day: '2-digit', month: 'long', year: 'numeric'
@@ -83,26 +141,41 @@ async function generateInvoice({ formType, formData, draftOrder }) {
     dueDate: new Date(Date.now() + 14 * 86400000).toLocaleDateString('en-AU', {
                day: '2-digit', month: 'long', year: 'numeric'
              }),
+    paymentTerms: 'Net 14 Days',
+
+    // Type flags
     isNdis:      formType === 'ndis',
     isAgedCare:  formType === 'aged_care',
     billingType: formType === 'ndis' ? 'NDIS' : 'Aged Care',
-    customerName:  `${formData.first_name} ${formData.last_name}`,
-    customerEmail: formData.email,
-    deliveryAddress: [
-      formData.address_line1,
-      `${formData.suburb} ${formData.state} ${formData.postcode}`,
-      'Australia'
-    ].join(', '),
-    ndisNumber:    formData.ndis_number   || '',
-    providerName:  formData.provider_name  || '',
-    providerEmail: formData.provider_email || '',
-    packageLevel:  formData.package_level  || '',
-    customerNotes: formData.notes          || '',
+
+    // Parties
+    billTo,
+    deliverTo,
+
+    // Type-specific blocks
+    ndis:     ndisData,
+    agedCare: agedCareData,
+
+    // Reference / PO
+    reference,
+    referenceLabel: formType === 'ndis' ? 'NDIS Reference' : 'Reference',
+    poNumber,
+
+    // Line items + totals
     lineItems: formatLineItems(draftOrder),
-    subtotal: `$${subtotal}`,
-    tax:      `$${tax}`,
-    total:    `$${total}`,
-    gstNote:  `GST included in total: $${tax}`,
+    subtotal:  `$${subtotal}`,
+    tax:       `$${tax}`,
+    total:     `$${total}`,
+    gstNote:   `GST included in total: $${tax}`,
+
+    // Customer notes
+    customerNotes: formData.notes || '',
+
+    // Bank / payment details
+    bankName:      process.env.BANK_NAME           || '',
+    accountName:   process.env.BANK_ACCOUNT_NAME   || '',
+    bsb:           process.env.BANK_BSB            || '',
+    accountNumber: process.env.BANK_ACCOUNT_NUMBER || '',
   };
 
   const html = template(templateData);
