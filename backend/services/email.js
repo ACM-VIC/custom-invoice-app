@@ -93,7 +93,7 @@ function buildEmailHtml({ formType, formData, draftOrder }) {
           <p>${billingType} Invoice Request from ${storeName}</p>
         </div>
         <div class="body">
-          <p>Dear ${formData.first_name},</p>
+          <p>Dear ${formData.submitter_full_name || formData.first_name},</p>
           <p>Thank you for your order. Please find your <strong>${billingType} tax invoice</strong> attached to this email.</p>
           <p>Your order has been placed on hold as a draft. Once we receive confirmation of payment, we will process and fulfil your order.</p>
 
@@ -142,10 +142,29 @@ async function sendInvoice({ formType, formData, draftOrder, pdfBuffer }) {
   const fromEmail   = process.env.OUTLOOK_EMAIL;
   const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
 
-  const toAddresses = [formData.email];
-  if (formType === 'ndis' && formData.provider_email) {
-    toAddresses.push(formData.provider_email);
-  }
+  // Collect every email address entered in the form
+  const toAddresses = [
+    // Person who filled the form (always sent)
+    formData.submitter_email,
+
+    // Participant email (optional field, both forms)
+    formData.participant_email,
+
+    // NDIS – Plan Manager accounts email (plan managed only)
+    formType === 'ndis' && formData.ndis_funding_type === 'plan_managed'
+      ? formData.plan_manager_email : null,
+
+    // Aged Care – Home Care Package provider accounts email
+    formType === 'aged_care' && formData.ac_funding_type === 'home_care_package'
+      ? formData.hcp_accounts_email : null,
+
+    // Aged Care – Other state-based program authorising body email
+    formType === 'aged_care' && formData.ac_funding_type === 'other_state_program'
+      ? formData.other_auth_email : null,
+  ]
+    .filter(Boolean)                  // remove nulls, undefined, empty strings
+    .map(e => e.trim().toLowerCase()) // normalise
+    .filter((e, i, arr) => arr.indexOf(e) === i); // deduplicate
 
   const mailOptions = {
     from:    `"${storeName}" <${fromEmail}>`,
