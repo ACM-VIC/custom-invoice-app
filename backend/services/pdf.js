@@ -2,6 +2,40 @@
  * PDF Service
  * Generates a professional tax invoice PDF using Puppeteer + Handlebars.
  */
+
+/**
+ * =========================================
+ * PDF SERVICE (INVOICE GENERATION)
+ * =========================================
+ *
+ * PURPOSE:
+ * Generates invoice PDF files using HTML + Puppeteer.
+ *
+ * FLOW:
+ * formData + draftOrder → HTML template → rendered PDF
+ *
+ * -----------------------------------------
+ *  WHAT YOU EDIT HERE
+ * -----------------------------------------
+ * INVOICE DESIGN:
+ * - HTML template layout
+ * - branding (logo, colors, fonts)
+ *
+ * DATA DISPLAY:
+ * - What fields appear in invoice
+ * - Table structure (products, totals)
+ *
+ * PDF SETTINGS:
+ * - page size
+ * - margins
+ * - print quality
+ *
+ * -----------------------------------------
+ *  DO NOT TOUCH
+ * -----------------------------------------
+ * - Puppeteer rendering logic unless needed
+ */
+
 const puppeteer  = require('puppeteer');
 const Handlebars = require('handlebars');
 const fs         = require('fs');
@@ -106,6 +140,7 @@ async function generateInvoice({ formType, formData, draftOrder }) {
 
   // ── NDIS-specific fields ───────────────────────────────────────────────────
   const ndisData = formType === 'ndis' ? {
+    name:            participantName      || '', 
     number:          formData.ndis_number          || '',
     supportCategory: formData.support_category     || '',
     fundingType:     (formData.ndis_funding_type   || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),

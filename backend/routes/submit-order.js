@@ -1,3 +1,39 @@
+/**
+ * =========================================
+ * SUBMIT-ORDER ROUTE (API CONTROLLER)
+ * =========================================
+ *
+ * PURPOSE:
+ * This file receives checkout form submissions from Shopify frontend,
+ * validates them, normalizes data, and sends them through the processing pipeline:
+ *
+ * PIPELINE:
+ * 1. Validate request
+ * 2. Normalize form data
+ * 3. Create Shopify Draft Order
+ * 4. Generate PDF invoice
+ * 5. Send email
+ *
+ * -----------------------------------------
+ * 🔧 WHAT YOU EDIT HERE
+ * -----------------------------------------
+ * FIELD MAPPING:
+ * - submitter_full_name → first_name / last_name logic
+ * - submitter_email → email normalization
+ *
+ * VALIDATION RULES:
+ * - Required fields (name, email, formType)
+ *
+ * DEBUGGING:
+ * - console.log statements for cart + formData
+ *
+ * -----------------------------------------
+ *  DO NOT TOUCH
+ * -----------------------------------------
+ * - Shopify → PDF → Email execution order
+ * - Name splitting logic unless you change frontend format
+ */
+
 const express        = require('express');
 const router         = express.Router();
 const shopifyService = require('../services/shopify');

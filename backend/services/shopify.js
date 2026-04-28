@@ -9,6 +9,43 @@
  * fetch error instead of a clear config error.
  */
 
+/**
+ * =========================================
+ * SHOPIFY SERVICE (DRAFT ORDER CREATION)
+ * =========================================
+ *
+ * PURPOSE:
+ * Handles all Shopify Admin API communication.
+ * Creates Draft Orders from cart + form data.
+ *
+ * OUTPUT:
+ * - Shopify Draft Order
+ * - Invoice notes
+ * - Metadata (tags, attributes)
+ *
+ * -----------------------------------------
+ * 🔧 WHAT YOU EDIT HERE
+ * -----------------------------------------
+ * SHOPIFY CONFIG:
+ * - SHOPIFY_SHOP_DOMAIN
+ * - SHOPIFY_ACCESS_TOKEN
+ * - API_VERSION
+
+ * INVOICE CONTENT:
+ * - buildNote() → modifies invoice text shown in Shopify
+ *
+ * PRODUCT MAPPING:
+ * - mapLineItems() → converts cart → Shopify format
+ *
+ * ORDER STRUCTURE:
+ * - draftOrderPayload → main Shopify order JSON
+ *
+ * -----------------------------------------
+ * DO NOT TOUCH
+ * -----------------------------------------
+ * - API endpoint structure (/draft_orders.json)
+ * - required Shopify fields (line_items, customer, etc.)
+ */
 const API_VERSION = '2024-01';
 
 function getConfig() {

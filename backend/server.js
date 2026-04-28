@@ -1,3 +1,40 @@
+/**
+ * =========================================
+ * SERVER.JS — MAIN EXPRESS BACKEND SERVER
+ * =========================================
+ *
+ * PURPOSE:
+ * This is the main entry point of the backend system.
+ * It initializes the Express app, applies security middleware,
+ * and registers all API routes.
+ *
+ * FLOW:
+ * Shopify Frontend → /api/submit-order → services → Shopify + PDF + Email
+ *
+ * -----------------------------------------
+ * 🔧 WHAT YOU EDIT HERE
+ * -----------------------------------------
+ * PORT:
+ * - Change server port (default: 8080)
+ *
+ * CORS SETTINGS:
+ * - Update allowed Shopify domains here:
+ *   corsOptions.origin
+ *
+ * RATE LIMITING:
+ * - Adjust request limits here:
+ *   app.use('/api/', rateLimit({...}))
+ *
+ * SECURITY:
+ * - Helmet config (rarely needed unless debugging headers)
+ *
+ * -----------------------------------------
+ * DO NOT TOUCH
+ * -----------------------------------------
+ * - express.json middleware (required for API body parsing)
+ * - route registration: app.use('/api', orderRoute)
+ */
+
 require('dotenv').config();
 const express    = require('express');
 const cors       = require('cors');

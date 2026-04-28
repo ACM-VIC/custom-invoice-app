@@ -3,6 +3,38 @@
  * Sends invoice emails via Microsoft Outlook / Office 365 SMTP.
  */
 
+/**
+ * =========================================
+ * EMAIL SERVICE (SMTP + ATTACHMENTS)
+ * =========================================
+ *
+ * PURPOSE:
+ * Sends invoice emails with PDF attachments to:
+ * - Customer
+ * - Plan Manager (NDIS)
+ * - Providers (Aged Care)
+ *
+ * -----------------------------------------
+ * WHAT YOU EDIT HERE
+ * -----------------------------------------
+ * SMTP SETTINGS:
+ * - email credentials (env vars)
+ * - Outlook / Office365 config
+ *
+ * EMAIL CONTENT:
+ * - subject line
+ * - HTML email template
+ * - message formatting
+ *
+ * RECIPIENT LOGIC:
+ * - who receives invoice based on formType
+ *
+ * -----------------------------------------
+ * DO NOT TOUCH
+ * -----------------------------------------
+ * - attachment handling (PDF buffer logic)
+ */
+
 const nodemailer = require('nodemailer');
 
 // ── Transporter (Outlook / Office 365 SMTP) ──────────────────────────────────
