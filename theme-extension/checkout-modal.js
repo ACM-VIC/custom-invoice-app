@@ -7,6 +7,8 @@
  * Forms updated to match:
  *  - NDIS Order Request Form (Plan Managed / Self Managed / Private)
  *  - Government & Aged Care Funded Order Request Form
+ *
+ * Brand: Montserrat headings, Poppins body, #DC4E00 accent, #696969 grey
  */
 
 (function () {
@@ -17,71 +19,151 @@
   // ─────────────────────────────────────────────────────────────────────────────
 
   const styles = `
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Poppins:wght@400;500&display=swap');
+
+    /* ── BRAND TOKENS ── */
+    :root {
+      --co-orange:   #DC4E00;
+      --co-orange-d: #b83e00;
+      --co-grey:     #696969;
+      --co-grey-hl:  #929487;
+      --co-white:    #FFFFFF;
+      --co-bg:       #F9F9F8;
+      --co-border:   #E2E2DF;
+      --co-text:     #1A1A1A;
+      --co-radius:   10px;
+    }
+
     #co-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.55);
+      background: rgba(26, 26, 26, 0.60);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       z-index: 99999;
       align-items: center;
       justify-content: center;
-      font-family: var(--font-body-family, sans-serif);
+      font-family: 'Poppins', sans-serif;
     }
     #co-overlay.active { display: flex; }
+
     #co-modal {
-      background: #fff;
+      background: var(--co-white);
       border-radius: 16px;
-      padding: 36px 32px 28px;
-      max-width: 560px;
+      padding: 0;
+      max-width: 620px;
       width: 95%;
       max-height: 90vh;
-      overflow-y: auto;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.22), 0 2px 8px rgba(220,78,0,0.08);
       position: relative;
     }
-    #co-modal h2 {
-      font-size: 20px;
-      font-weight: 600;
-      margin: 0 0 6px;
-      color: #111;
+
+    /* ── MODAL HEADER STRIPE ── */
+    #co-modal-header {
+      background: var(--co-orange);
+      padding: 20px 28px 18px;
+      flex-shrink: 0;
+      position: relative;
     }
-    #co-modal p.co-sub {
-      font-size: 14px;
-      color: #666;
-      margin: 0 0 24px;
+    #co-modal-header h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--co-white);
+      margin: 0 40px 4px 0;
+      letter-spacing: -0.2px;
+      line-height: 1.3;
+      text-align: center;
+    }
+    #co-modal-header p.co-sub {
+      font-size: 13px;
+      color: rgba(255,255,255,0.82);
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      font-weight: 400;
+      text-align: center;
+    }
+
+    /* ── CLOSE BUTTON ── */
+    #co-close {
+      position: absolute;
+      top: 16px; right: 18px;
+      background: rgba(255,255,255,0.18);
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      color: var(--co-white);
+      line-height: 1;
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    #co-close:hover { background: rgba(255,255,255,0.32); }
+
+    /* ── SCROLLABLE BODY ── */
+    #co-modal-body {
+      overflow-y: auto;
+      padding: 24px 28px 28px;
+      flex: 1;
+    }
+
+    /* ── OPTION BUTTONS GRID ── */
+    #co-options-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 4px 2px;
     }
     .co-btn {
-      display: flex;
-      align-items: center;
-      gap: 14px;
       width: 100%;
-      padding: 16px 20px;
-      border-radius: 10px;
-      border: 1.5px solid #e5e5e5;
-      background: #fafafa;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 20px;
+      padding: 18px 24px;
+      border-radius: 12px;
+      border: none;
+      background: var(--co-orange);
       cursor: pointer;
-      margin-bottom: 12px;
       text-align: left;
-      transition: border-color 0.15s, background 0.15s;
+      transition: background 0.18s, transform 0.14s, box-shadow 0.18s;
+      font-family: 'Poppins', sans-serif;
+      min-height: 80px;
     }
-    .co-btn:hover { border-color: #1a1a1a; background: #f0f0f0; }
-    .co-btn:last-child { margin-bottom: 0; }
+    .co-btn:hover {
+      background: #3DAA5C;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    }
+    .co-btn:active { transform: translateY(0); }
+
     .co-btn-icon {
-      width: 40px; height: 40px;
-      border-radius: 8px;
+      width: 56px; height: 56px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
       flex-shrink: 0;
     }
-    .co-btn-icon.green  { background: #e6f4ea; }
-    .co-btn-icon.blue   { background: #e8f0fe; }
-    .co-btn-icon.purple { background: #f3e8fd; }
-    .co-btn-label { font-size: 15px; font-weight: 600; color: #111; display: block; }
-    .co-btn-desc  { font-size: 12px; color: #777; display: block; margin-top: 2px; }
-    #co-close {
-      position: absolute; top: 16px; right: 18px;
-      background: none; border: none; font-size: 22px;
-      cursor: pointer; color: #999; line-height: 1;
+    .co-btn-img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+    }
+
+    .co-btn-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      display: block;
+      line-height: 1.3;
+    }
+    .co-btn-desc {
+      display: none;
     }
 
     /* ── FORM PANEL ── */
@@ -90,137 +172,331 @@
     #co-options-panel.hidden { display: none; }
 
     .co-form-title {
-      font-size: 17px; font-weight: 600; color: #111;
-      margin: 0 0 4px; display: flex; align-items: center; gap: 10px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--co-text);
+      margin: 0 0 2px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     .co-form-subtitle {
-      font-size: 13px; color: #666;
-      margin: 0 0 20px; padding-left: 30px;
+      font-size: 12px;
+      color: var(--co-grey);
+      margin: 0 0 20px;
+      padding-left: 30px;
+      font-family: 'Poppins', sans-serif;
     }
     .co-back {
-      background: none; border: none; cursor: pointer;
-      font-size: 20px; color: #555; padding: 0; line-height: 1;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      color: var(--co-orange);
+      padding: 0;
+      line-height: 1;
+      transition: opacity 0.15s;
     }
+    .co-back:hover { opacity: 0.7; }
 
-    /* Section headings inside form */
+    /* ── SECTION HEADINGS ── */
     .co-section-heading {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .8px; color: #888;
-      margin: 22px 0 12px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid #eee;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--co-orange);
+      margin: 24px 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #F2E0D8;
     }
     .co-section-heading:first-child { margin-top: 0; }
 
+    /* ── FIELDS ── */
     .co-field { margin-bottom: 14px; }
     .co-field label {
-      display: block; font-size: 13px; font-weight: 500;
-      color: #444; margin-bottom: 5px;
+      display: block;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--co-grey);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
     }
     .co-field label .co-optional {
-      font-weight: 400; color: #aaa; font-size: 12px; margin-left: 4px;
+      font-weight: 400;
+      color: var(--co-grey-hl);
+      font-size: 11px;
+      margin-left: 4px;
+      text-transform: none;
+      letter-spacing: 0;
     }
-    .co-field input, .co-field textarea, .co-field select {
-      width: 100%; box-sizing: border-box;
+    .co-field input,
+    .co-field textarea,
+    .co-field select {
+      width: 100%;
+      box-sizing: border-box;
       padding: 10px 13px;
-      border: 1.5px solid #ddd;
+      border: 1.5px solid var(--co-border);
       border-radius: 8px;
-      font-size: 14px; color: #111;
-      font-family: inherit;
-      transition: border-color 0.15s;
-      background: #fff;
+      font-size: 13px;
+      color: var(--co-text);
+      font-family: 'Poppins', sans-serif;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: var(--co-white);
     }
-    .co-field input:focus, .co-field textarea:focus, .co-field select:focus {
-      outline: none; border-color: #1a1a1a;
+    .co-field input:focus,
+    .co-field textarea:focus,
+    .co-field select:focus {
+      outline: none;
+      border-color: var(--co-orange);
+      box-shadow: 0 0 0 3px rgba(220,78,0,0.10);
     }
+    .co-field input::placeholder,
+    .co-field textarea::placeholder { color: #BBBAB5; }
     .co-field textarea { resize: vertical; min-height: 76px; }
+
     .co-row { display: flex; gap: 12px; }
     .co-row .co-field { flex: 1; }
 
-    /* Radio groups */
+    /* ── RADIO GROUPS ── */
     .co-radio-group { display: flex; flex-direction: column; gap: 8px; }
     .co-radio-option {
-      display: flex; align-items: flex-start; gap: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
       padding: 10px 13px;
-      border: 1.5px solid #ddd;
+      border: 1.5px solid var(--co-border);
       border-radius: 8px;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
+      font-family: 'Poppins', sans-serif;
     }
     .co-radio-option:has(input:checked) {
-      border-color: #1a1a1a; background: #f8f8f8;
+      border-color: var(--co-orange);
+      background: #FFF7F3;
     }
     .co-radio-option input[type="radio"] {
-      margin-top: 2px; flex-shrink: 0;
-      width: auto; padding: 0; border: none;
+      margin-top: 3px;
+      flex-shrink: 0;
+      width: auto;
+      padding: 0;
+      border: none;
+      accent-color: var(--co-orange);
     }
-    .co-radio-label { font-size: 13px; font-weight: 500; color: #111; }
-    .co-radio-desc  { font-size: 12px; color: #777; display: block; margin-top: 1px; }
+    .co-radio-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--co-text);
+    }
+    .co-radio-desc {
+      font-size: 12px;
+      color: var(--co-grey);
+      display: block;
+      margin-top: 2px;
+      font-family: 'Poppins', sans-serif;
+    }
 
-    /* Checkbox */
+    /* ── CHECKBOXES ── */
     .co-checkbox-group { display: flex; flex-direction: column; gap: 8px; }
     .co-checkbox-option {
-      display: flex; align-items: flex-start; gap: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
       padding: 10px 13px;
-      border: 1.5px solid #ddd;
+      border: 1.5px solid var(--co-border);
       border-radius: 8px;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
     }
     .co-checkbox-option:has(input:checked) {
-      border-color: #1a1a1a; background: #f8f8f8;
+      border-color: var(--co-orange);
+      background: #FFF7F3;
     }
     .co-checkbox-option input[type="checkbox"] {
-      margin-top: 2px; flex-shrink: 0;
-      width: auto; padding: 0; border: none;
+      margin-top: 2px;
+      flex-shrink: 0;
+      width: auto;
+      padding: 0;
+      border: none;
+      accent-color: var(--co-orange);
     }
-    .co-checkbox-label { font-size: 13px; color: #333; line-height: 1.5; }
+    .co-checkbox-label {
+      font-size: 13px;
+      color: var(--co-grey);
+      line-height: 1.5;
+      font-family: 'Poppins', sans-serif;
+    }
 
-    /* Policy/info boxes */
+    /* ── INFO BOX ── */
     .co-info-box {
-      background: #f8f9fa; border-left: 3px solid #1a1a1a;
-      border-radius: 6px; padding: 12px 14px;
-      font-size: 12px; color: #555; line-height: 1.6;
+      background: #FFF7F3;
+      border-left: 3px solid var(--co-orange);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--co-grey);
+      line-height: 1.7;
       margin-bottom: 14px;
+      font-family: 'Poppins', sans-serif;
     }
-    .co-info-box strong { color: #1a1a1a; }
+    .co-info-box strong {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      color: var(--co-orange);
+    }
 
-    /* Conditional sections */
+    /* ── CONDITIONAL SECTIONS ── */
     .co-conditional { display: none; }
     .co-conditional.visible { display: block; }
 
+    /* ── SUBMIT BUTTON ── */
     .co-submit {
-      width: 100%; padding: 14px;
-      background: #1a1a1a; color: #fff;
-      border: none; border-radius: 10px;
-      font-size: 15px; font-weight: 600;
-      cursor: pointer; margin-top: 12px;
-      transition: background 0.15s;
+      width: 100%;
+      padding: 14px;
+      background: var(--co-orange);
+      color: var(--co-white);
+      border: none;
+      border-radius: var(--co-radius);
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      margin-top: 16px;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.12s;
     }
-    .co-submit:hover { background: #333; }
-    .co-submit:disabled { background: #999; cursor: not-allowed; }
-    .co-error {
-      color: #c0392b; font-size: 13px;
-      margin-top: 10px; display: none;
+    .co-submit:hover {
+      background: var(--co-orange-d);
+      box-shadow: 0 4px 16px rgba(220,78,0,0.28);
+      transform: translateY(-1px);
     }
-    .co-success-msg {
-      text-align: center; padding: 20px 0 10px;
+    .co-submit:active { transform: translateY(0); }
+    .co-submit:disabled {
+      background: var(--co-grey-hl);
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
     }
-    .co-success-msg .co-tick { font-size: 42px; margin-bottom: 10px; }
-    .co-success-msg h3 { font-size: 18px; color: #111; margin: 0 0 8px; }
-    .co-success-msg p  { font-size: 14px; color: #666; margin: 0; }
 
-    /* Table wrapper */
+    .co-error {
+      color: #C0392B;
+      font-size: 12px;
+      margin-top: 10px;
+      display: none;
+      font-family: 'Poppins', sans-serif;
+      text-align: center;
+    }
+
+    /* ── SUCCESS ── */
+    .co-success-msg {
+      text-align: center;
+      padding: 32px 0 16px;
+    }
+    .co-success-msg .co-tick { font-size: 48px; margin-bottom: 14px; }
+    .co-success-msg h3 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--co-text);
+      margin: 0 0 10px;
+    }
+    .co-success-msg p {
+      font-size: 13px;
+      color: var(--co-grey);
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      line-height: 1.7;
+    }
+
+    /* ── HELPER TEXT ── */
+    p[style*="color:#888"],
+    p[style*="color: #888"],
+    p[style*="color:#666"],
+    p[style*="color: #666"] {
+      font-family: 'Poppins', sans-serif !important;
+    }
+
+    /* Scrollbar styling */
+    #co-modal-body::-webkit-scrollbar { width: 4px; }
+    #co-modal-body::-webkit-scrollbar-track { background: transparent; }
+    #co-modal-body::-webkit-scrollbar-thumb { background: var(--co-border); border-radius: 4px; }
+    #co-modal-body::-webkit-scrollbar-thumb:hover { background: var(--co-grey-hl); }
+
     .table-wrapper {
-      border: 1px solid #e5e5e5;
+      border: 1px solid var(--co-border);
       border-radius: 6px;
       overflow: hidden;
       margin-bottom: 16px;
     }
+
+    /* ── MOBILE RESPONSIVE ── */
+    @media (max-width: 480px) {
+      #co-modal {
+        max-width: 95%;
+        width: 95%;
+        max-height: 90dvh;
+        border-radius: 16px;
+        margin: auto;
+      }
+      #co-overlay {
+        align-items: center;
+      }
+      #co-modal-header {
+        padding: 18px 20px 14px;
+      }
+      #co-modal-header h2 {
+        font-size: 16px;
+      }
+      #co-modal-body {
+        padding: 18px 16px 32px;
+      }
+      .co-btn {
+        padding: 14px 18px;
+        gap: 16px;
+        min-height: 68px;
+      }
+      .co-btn-icon {
+        width: 44px; height: 44px;
+      }
+      .co-btn-img {
+        width: 44px; height: 44px;
+      }
+      .co-btn-label {
+        font-size: 14px;
+      }
+      .co-row {
+        flex-direction: column;
+        gap: 0;
+      }
+      .co-row .co-field[style*="max-width"] {
+        max-width: 100% !important;
+      }
+      .co-field input,
+      .co-field textarea,
+      .co-field select {
+        font-size: 16px; /* prevents iOS zoom on focus */
+      }
+      .co-submit {
+        font-size: 15px;
+        padding: 15px;
+      }
+      #co-modal-header h2 {
+        margin-right: 36px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .co-btn-label { font-size: 13px; }
+      .co-btn { padding: 12px 14px; gap: 12px; }
+    }
   `;
 
   // ─── NDIS FORM ───────────────────────────────────────────────────────────────
-  // Based on the NDIS Order Request Form spec.
   const NDIS_FIELDS = `
     <!-- SECTION 1: FUNDING TYPE -->
     <div class="co-section-heading">Section 1 — Funding Type</div>
@@ -249,12 +525,12 @@
           </span>
         </label>
       </div>
-      <p style="font-size:12px;color:#888;margin-top:8px;">We will guide you through the correct process for your selected funding type. All orders must be paid in full prior to dispatch, delivery or installation.</p>
+      <p style="font-size:12px;color:#888;margin-top:8px;font-family:'Poppins',sans-serif;">We will guide you through the correct process for your selected funding type. All orders must be paid in full prior to dispatch, delivery or installation.</p>
     </div>
 
     <!-- SECTION 2: PERSON COMPLETING FORM -->
     <div class="co-section-heading">Section 2 — Your Details</div>
-    <p style="font-size:12px;color:#666;margin-bottom:12px;">So we know who to contact if anything requires clarification.</p>
+    <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">So we know who to contact if anything requires clarification.</p>
     <div class="co-field">
       <label>I am: *</label>
       <div class="co-radio-group">
@@ -296,17 +572,17 @@
         <input type="tel" name="submitter_phone" required placeholder="04XX XXX XXX">
       </div>
     </div>
-    <p style="font-size:12px;color:#888;margin-bottom:4px;">Order confirmations will be sent to the email provided above.</p>
+    <p style="font-size:12px;color:#888;margin-bottom:4px;font-family:'Poppins',sans-serif;">Order confirmations will be sent to the email provided above.</p>
 
     <!-- SECTION 3: PARTICIPANT DETAILS -->
     <div class="co-section-heading">Section 3 — Participant Details</div>
-    <p style="font-size:12px;color:#666;margin-bottom:12px;">These details ensure the invoice, funding and delivery are processed accurately and without delay.</p>
+    <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">These details ensure the invoice, funding and delivery are processed accurately and without delay.</p>
     <div class="co-field">
       <label>Participant Full Name * <span class="co-optional">(as it appears on the NDIS plan)</span></label>
       <input type="text" name="participant_full_name" required placeholder="Participant full name">
     </div>
     <div class="co-field" id="co-ndis-number-field">
-      <label>NDIS Number * <span class="co-optional">(required for NDIS-funded orders)</span></label>
+      <label>NDIS Number <span class="co-optional">(if applicable)</span></label>
       <input type="text" name="ndis_number" placeholder="43XXXXXXXX" maxlength="9">
     </div>
     <div class="co-field">
@@ -348,7 +624,7 @@
     <!-- SECTION 4: PLAN MANAGER DETAILS (conditional – plan managed only) -->
     <div class="co-conditional" id="co-ndis-plan-manager-section">
       <div class="co-section-heading">Section 4 — Plan Manager Details</div>
-      <p style="font-size:12px;color:#666;margin-bottom:12px;">We will send a formal invoice directly to your nominated Plan Manager.</p>
+      <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">We will send a formal invoice directly to your nominated Plan Manager.</p>
       <div class="co-field">
         <label>Plan Manager Company Name *</label>
         <input type="text" name="plan_manager_company" placeholder="Company name">
@@ -367,7 +643,7 @@
           <input type="text" name="plan_manager_reference" placeholder="e.g. Daily Activities">
         </div>
       </div>
-      <p style="font-size:12px;color:#888;margin-bottom:4px;">Orders are processed once payment has been received from the Plan Manager.</p>
+      <p style="font-size:12px;color:#888;margin-bottom:4px;font-family:'Poppins',sans-serif;">Orders are processed once payment has been received from the Plan Manager.</p>
     </div>
 
     <!-- SECTION 5: PAYMENT & DISPATCH POLICY -->
@@ -387,17 +663,17 @@
       </label>
     </div>
 
-    <!-- SECTION 6: FUNDING CONFIRMATION (conditional – NDIS funding) -->
-    <div class="co-conditional visible" id="co-ndis-funding-confirmation">
+    <!-- SECTION 6: FUNDING CONFIRMATION (conditional – NDIS funding only, not private) -->
+    <div class="co-conditional" id="co-ndis-funding-confirmation">
       <div class="co-section-heading">Section 6 — Funding Confirmation</div>
-      <p style="font-size:12px;color:#666;margin-bottom:12px;">This helps ensure the order aligns with NDIS requirements.</p>
+      <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">This helps ensure the order aligns with NDIS requirements.</p>
       <div class="co-checkbox-group">
         <label class="co-checkbox-option">
-          <input type="checkbox" name="ndis_funding_available" required>
+          <input type="checkbox" name="ndis_funding_available">
           <span class="co-checkbox-label">I confirm funding is available within the participant's NDIS plan. *</span>
         </label>
         <label class="co-checkbox-option">
-          <input type="checkbox" name="ndis_reasonable_necessary" required>
+          <input type="checkbox" name="ndis_reasonable_necessary">
           <span class="co-checkbox-label">I confirm the requested supports are reasonable and necessary. *</span>
         </label>
       </div>
@@ -417,7 +693,7 @@
 
     <!-- SECTION 8: DECLARATION -->
     <div class="co-section-heading">Section 8 — Declaration & Authority</div>
-    <p style="font-size:12px;color:#666;margin-bottom:12px;">By submitting this order request:</p>
+    <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">By submitting this order request:</p>
     <div class="co-checkbox-group">
       <label class="co-checkbox-option">
         <input type="checkbox" name="ndis_authorised" required>
@@ -452,7 +728,6 @@
   `;
 
   // ─── GOVERNMENT / AGED CARE FORM ─────────────────────────────────────────────
-  // Based on the Government & Aged Care Funded Order Request Form spec.
   const AGED_CARE_FIELDS = `
     <!-- SECTION 1: FUNDING PROGRAM -->
     <div class="co-section-heading">Section 1 — Funding Program</div>
@@ -505,12 +780,12 @@
           </span>
         </label>
       </div>
-      <p style="font-size:12px;color:#888;margin-top:8px;">Selecting the correct funding type ensures invoices and documentation are issued correctly.</p>
+      <p style="font-size:12px;color:#888;margin-top:8px;font-family:'Poppins',sans-serif;">Selecting the correct funding type ensures invoices and documentation are issued correctly.</p>
     </div>
 
     <!-- SECTION 2: PERSON COMPLETING FORM -->
     <div class="co-section-heading">Section 2 — Your Details</div>
-    <p style="font-size:12px;color:#666;margin-bottom:12px;">So we know who to contact if anything requires clarification.</p>
+    <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">So we know who to contact if anything requires clarification.</p>
     <div class="co-field">
       <label>I am: *</label>
       <div class="co-radio-group">
@@ -554,11 +829,11 @@
         <input type="tel" name="submitter_phone" required placeholder="04XX XXX XXX">
       </div>
     </div>
-    <p style="font-size:12px;color:#888;margin-bottom:4px;">Order confirmations will be sent to the email provided above.</p>
+    <p style="font-size:12px;color:#888;margin-bottom:4px;font-family:'Poppins',sans-serif;">Order confirmations will be sent to the email provided above.</p>
 
     <!-- SECTION 3: PARTICIPANT / CLIENT DETAILS -->
     <div class="co-section-heading">Section 3 — Participant / Client Details</div>
-    <p style="font-size:12px;color:#666;margin-bottom:12px;">These details ensure accurate invoicing, funding compliance and delivery.</p>
+    <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">These details ensure accurate invoicing, funding compliance and delivery.</p>
     <div class="co-field">
       <label>Participant / Client Full Name *</label>
       <input type="text" name="participant_full_name" required placeholder="Client full name">
@@ -610,7 +885,7 @@
     <!-- Home Care Package -->
     <div class="co-conditional" id="co-ac-hcp-section">
       <div class="co-section-heading">Section 4 — Provider Details (Home Care Package)</div>
-      <p style="font-size:12px;color:#666;margin-bottom:12px;">Invoices will be issued directly to the provider organisation.</p>
+      <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">Invoices will be issued directly to the provider organisation.</p>
       <div class="co-field">
         <label>Provider Organisation Name *</label>
         <input type="text" name="hcp_provider_name" placeholder="Provider name">
@@ -700,15 +975,15 @@
     </div>
 
     <!-- SECTION 6: FUNDING CONFIRMATION (conditional – provider/govt funded) -->
-    <div class="co-conditional visible" id="co-ac-funding-confirmation">
+    <div class="co-conditional" id="co-ac-funding-confirmation">
       <div class="co-section-heading">Section 6 — Funding Confirmation</div>
       <div class="co-checkbox-group">
         <label class="co-checkbox-option">
-          <input type="checkbox" name="ac_funding_obtained" required>
+          <input type="checkbox" name="ac_funding_obtained">
           <span class="co-checkbox-label">I confirm funding or program approval has been obtained for this purchase. *</span>
         </label>
         <label class="co-checkbox-option">
-          <input type="checkbox" name="ac_authorised_request" required>
+          <input type="checkbox" name="ac_authorised_request">
           <span class="co-checkbox-label">I confirm I am authorised to request this purchase under the nominated funding program. *</span>
         </label>
       </div>
@@ -728,7 +1003,7 @@
 
     <!-- SECTION 8: DECLARATION -->
     <div class="co-section-heading">Section 8 — Declaration & Authority</div>
-    <p style="font-size:12px;color:#666;margin-bottom:12px;">By submitting this request:</p>
+    <p style="font-size:12px;color:#696969;margin-bottom:12px;font-family:'Poppins',sans-serif;">By submitting this request:</p>
     <div class="co-checkbox-group">
       <label class="co-checkbox-option">
         <input type="checkbox" name="ac_authorised" required>
@@ -763,7 +1038,14 @@
   }
 
   function getCartData() {
-    return fetch('/cart.js').then(r => r.json());
+    return fetch('/cart.js')
+      .then(r => {
+        if (!r.ok) throw new Error('Cart fetch failed');
+        return r.json();
+      })
+      .catch(() => {
+        return { items: [], item_count: 0, total_price: 0 };
+      });
   }
 
   function buildModal() {
@@ -771,56 +1053,63 @@
     overlay.id = 'co-overlay';
     overlay.innerHTML = `
       <div id="co-modal" role="dialog" aria-modal="true" aria-labelledby="co-title">
-        <button id="co-close" aria-label="Close">&times;</button>
 
-        <!-- OPTIONS PANEL -->
-        <div id="co-options-panel">
-          <h2 id="co-title">How would you like to proceed?</h2>
-          <p class="co-sub">Choose your payment or billing method below.</p>
-
-          <button class="co-btn" id="co-paynow">
-            <span class="co-btn-icon green">💳</span>
-            <span>
-              <span class="co-btn-label">Pay Now</span>
-              <span class="co-btn-desc">Proceed to standard Shopify checkout</span>
-            </span>
-          </button>
-
-          <button class="co-btn" id="co-agedcare">
-            <span class="co-btn-icon blue">🏠</span>
-            <span>
-              <span class="co-btn-label">Government & Aged Care</span>
-              <span class="co-btn-desc">Support at Home, HCP, DVA, SWEP and other funded programs</span>
-            </span>
-          </button>
-
-          <button class="co-btn" id="co-ndis">
-            <span class="co-btn-icon purple">♿</span>
-            <span>
-              <span class="co-btn-label">NDIS</span>
-              <span class="co-btn-desc">Plan Managed, Self Managed — we'll handle invoicing for your plan</span>
-            </span>
-          </button>
+        <!-- BRANDED HEADER -->
+        <div id="co-modal-header">
+          <button id="co-close" aria-label="Close">&times;</button>
+          <h2 id="co-title">How would you like to Pay</h2>
+          <p class="co-sub">Choose your preferred payment method</p>
         </div>
 
-        <!-- FORM PANEL -->
-        <div id="co-form-panel">
-          <div class="co-form-title">
-            <button class="co-back" id="co-back" aria-label="Back">&#8592;</button>
-            <span id="co-form-heading"></span>
+        <!-- SCROLLABLE BODY -->
+        <div id="co-modal-body">
+
+          <!-- OPTIONS PANEL -->
+          <div id="co-options-panel">
+
+            <button class="co-btn" id="co-paynow">
+              <span class="co-btn-icon">
+                <img src="https://cdn.shopify.com/s/files/1/0363/8955/2187/files/Card-payment.png?v=1770793099" class="co-btn-img" alt="Credit Card / PayPal">
+              </span>
+              <span class="co-btn-label">Credit Card / PayPal</span>
+            </button>
+
+            <button class="co-btn" id="co-ndis">
+              <span class="co-btn-icon">
+                <img src="https://cdn.shopify.com/s/files/1/0363/8955/2187/files/NDIS-form.png?v=1770793099" class="co-btn-img" alt="I Have NDIS">
+              </span>
+              <span class="co-btn-label">I Have NDIS</span>
+            </button>
+
+            <button class="co-btn" id="co-agedcare">
+              <span class="co-btn-icon">
+                <img src="https://cdn.shopify.com/s/files/1/0363/8955/2187/files/SaH-icon.png?v=1770793100" class="co-btn-img" alt="Aged Care Invoice">
+              </span>
+              <span class="co-btn-label">Aged Care Invoice</span>
+            </button>
+
           </div>
-          <p class="co-form-subtitle" id="co-form-subtitle"></p>
-          <form id="co-form" novalidate>
-            <div id="co-form-fields"></div>
-            <button type="submit" class="co-submit" id="co-submit-btn">Submit Order Request</button>
-            <div class="co-error" id="co-form-error">Something went wrong. Please try again.</div>
-          </form>
-          <div class="co-success-msg" id="co-success" style="display:none">
-            <div class="co-tick">✅</div>
-            <h3>Request submitted!</h3>
-            <p>Our team will review your request and send confirmation shortly.<br>If you need assistance, please contact us — we're here to help.</p>
+
+          <!-- FORM PANEL -->
+          <div id="co-form-panel">
+            <div class="co-form-title">
+              <button class="co-back" id="co-back" aria-label="Back">&#8592;</button>
+              <span id="co-form-heading"></span>
+            </div>
+            <p class="co-form-subtitle" id="co-form-subtitle"></p>
+            <form id="co-form" novalidate>
+              <div id="co-form-fields"></div>
+              <button type="submit" class="co-submit" id="co-submit-btn">Submit Order Request</button>
+              <div class="co-error" id="co-form-error">Something went wrong. Please try again.</div>
+            </form>
+            <div class="co-success-msg" id="co-success" style="display:none">
+              <div class="co-tick">✅</div>
+              <h3>Request submitted!</h3>
+              <p>Our team will review your request and send confirmation shortly.<br>If you need assistance, please contact us — we're here to help.</p>
+            </div>
           </div>
-        </div>
+
+        </div><!-- /co-modal-body -->
       </div>
     `;
     document.body.appendChild(overlay);
@@ -829,51 +1118,64 @@
 
   // ─── CONDITIONAL LOGIC: NDIS ──────────────────────────────────────────────────
   function bindNdisConditionals(formFields) {
-    const fundingRadios = formFields.querySelectorAll('[name="ndis_funding_type"]');
+    const fundingRadios      = formFields.querySelectorAll('[name="ndis_funding_type"]');
     const planManagerSection = formFields.querySelector('#co-ndis-plan-manager-section');
-    const ndisNumberField = formFields.querySelector('#co-ndis-number-field');
+    const ndisNumberField    = formFields.querySelector('#co-ndis-number-field');
     const fundingConfirmation = formFields.querySelector('#co-ndis-funding-confirmation');
+
+    if (planManagerSection)    planManagerSection.classList.remove('visible');
+    if (fundingConfirmation)   fundingConfirmation.classList.remove('visible');
+
+    if (fundingConfirmation) {
+      fundingConfirmation.querySelectorAll('input[type="checkbox"]').forEach(el => {
+        el.required = false;
+      });
+    }
+    if (planManagerSection) {
+      planManagerSection.querySelector('[name="plan_manager_company"]') &&
+        (planManagerSection.querySelector('[name="plan_manager_company"]').required = false);
+      planManagerSection.querySelector('[name="plan_manager_email"]') &&
+        (planManagerSection.querySelector('[name="plan_manager_email"]').required = false);
+    }
 
     function update() {
       const selected = formFields.querySelector('[name="ndis_funding_type"]:checked');
       const val = selected ? selected.value : '';
-      const isNdis = val === 'plan_managed' || val === 'self_managed';
+      const isNdis        = val === 'plan_managed' || val === 'self_managed';
       const isPlanManaged = val === 'plan_managed';
 
-      // Plan manager section – only for plan managed
-      planManagerSection.classList.toggle('visible', isPlanManaged);
+      fundingRadios.forEach(r => {
+        r.closest('.co-radio-option').style.borderColor = '';
+      });
 
-      // NDIS number required for NDIS-funded orders
-      const ndisInput = ndisNumberField ? ndisNumberField.querySelector('input') : null;
-      if (ndisInput) {
-        ndisInput.required = isNdis;
-        const label = ndisNumberField.querySelector('label');
-        if (label) {
-          label.innerHTML = isNdis
-            ? 'NDIS Number *'
-            : 'NDIS Number <span class="co-optional">(if applicable)</span>';
-        }
-      }
-
-      // Plan manager fields required when plan managed
       if (planManagerSection) {
+        planManagerSection.classList.toggle('visible', isPlanManaged);
         const pmCompany = planManagerSection.querySelector('[name="plan_manager_company"]');
         const pmEmail   = planManagerSection.querySelector('[name="plan_manager_email"]');
         if (pmCompany) pmCompany.required = isPlanManaged;
         if (pmEmail)   pmEmail.required   = isPlanManaged;
       }
 
-      // Funding confirmation only shown for NDIS types (not private)
+      const ndisInput = ndisNumberField ? ndisNumberField.querySelector('input') : null;
+      if (ndisInput) {
+        ndisInput.required = isNdis;
+        const labelEl = ndisNumberField.querySelector('label');
+        if (labelEl) {
+          labelEl.innerHTML = isNdis
+            ? 'NDIS Number *'
+            : 'NDIS Number <span class="co-optional">(if applicable)</span>';
+        }
+      }
+
       if (fundingConfirmation) {
         fundingConfirmation.classList.toggle('visible', isNdis);
-        fundingConfirmation.querySelectorAll('[required]').forEach(el => {
+        fundingConfirmation.querySelectorAll('input[type="checkbox"]').forEach(el => {
           el.required = isNdis;
         });
       }
     }
 
     fundingRadios.forEach(r => r.addEventListener('change', update));
-    update();
   }
 
   // ─── CONDITIONAL LOGIC: AGED CARE ────────────────────────────────────────────
@@ -885,11 +1187,24 @@
     const otherSection  = formFields.querySelector('#co-ac-other-section');
     const fundingConf   = formFields.querySelector('#co-ac-funding-confirmation');
 
+    [hcpSection, dvaSection, swepSection, otherSection].forEach(el => {
+      if (el) {
+        el.classList.remove('visible');
+        el.querySelectorAll('input, select, textarea').forEach(i => { i.required = false; });
+      }
+    });
+    if (fundingConf) {
+      fundingConf.classList.remove('visible');
+      fundingConf.querySelectorAll('input[type="checkbox"]').forEach(el => {
+        el.required = false;
+      });
+    }
+
     const conditionalSections = [
-      { el: hcpSection,   val: 'home_care_package',  requiredNames: ['hcp_provider_name','hcp_accounts_email'] },
+      { el: hcpSection,   val: 'home_care_package',  requiredNames: ['hcp_provider_name', 'hcp_accounts_email'] },
       { el: dvaSection,   val: 'dva_allianz',         requiredNames: ['dva_file_number'] },
-      { el: swepSection,  val: 'swep',                requiredNames: ['swep_reference','swep_prescriber'] },
-      { el: otherSection, val: 'other_state_program', requiredNames: ['other_program_name','other_approval_ref'] },
+      { el: swepSection,  val: 'swep',                requiredNames: ['swep_reference', 'swep_prescriber'] },
+      { el: otherSection, val: 'other_state_program', requiredNames: ['other_program_name', 'other_approval_ref'] },
     ];
 
     function update() {
@@ -897,17 +1212,23 @@
       const val = selected ? selected.value : '';
       const isPrivate = val === 'private' || val === 'support_at_home';
 
+      fundingRadios.forEach(r => {
+        r.closest('.co-radio-option').style.borderColor = '';
+      });
+
       conditionalSections.forEach(({ el, val: sectionVal, requiredNames }) => {
         if (!el) return;
         const show = val === sectionVal;
         el.classList.toggle('visible', show);
-        requiredNames.forEach(name => {
-          const input = el.querySelector(`[name="${name}"]`);
-          if (input) input.required = show;
-        });
+        el.querySelectorAll('input, select, textarea').forEach(i => { i.required = false; });
+        if (show) {
+          requiredNames.forEach(name => {
+            const input = el.querySelector(`[name="${name}"]`);
+            if (input) input.required = true;
+          });
+        }
       });
 
-      // Funding confirmation hidden for private/self-funded
       if (fundingConf) {
         const showConf = !isPrivate && val !== '';
         fundingConf.classList.toggle('visible', showConf);
@@ -918,41 +1239,47 @@
     }
 
     fundingRadios.forEach(r => r.addEventListener('change', update));
-    update();
   }
 
   // ─── VALIDATION ───────────────────────────────────────────────────────────────
   function validateForm(form) {
     const inputs = form.querySelectorAll('[required]');
     let valid = true;
+
     inputs.forEach(input => {
       input.style.borderColor = '';
-      // Only validate visible inputs (skip inputs inside hidden conditional sections)
+
       const inHiddenConditional = input.closest('.co-conditional:not(.visible)');
       if (inHiddenConditional) return;
+
       if (input.type === 'checkbox' && !input.checked) {
-        input.closest('.co-checkbox-option').style.borderColor = '#c0392b';
+        input.closest('.co-checkbox-option').style.borderColor = '#C0392B';
         valid = false;
       } else if (input.type !== 'checkbox' && !input.value.trim()) {
-        input.style.borderColor = '#c0392b';
+        input.style.borderColor = '#C0392B';
         valid = false;
       }
     });
-    // Validate at least one radio selected for required radio groups
+
     const radioGroups = {};
     form.querySelectorAll('input[type="radio"][required]').forEach(r => {
-      radioGroups[r.name] = radioGroups[r.name] || [];
-      radioGroups[r.name].push(r);
+      if (r.closest('.co-conditional:not(.visible)')) return;
+      if (!radioGroups[r.name]) {
+        radioGroups[r.name] = Array.from(
+          form.querySelectorAll(`input[type="radio"][name="${r.name}"]`)
+        ).filter(rr => !rr.closest('.co-conditional:not(.visible)'));
+      }
     });
     Object.entries(radioGroups).forEach(([name, radios]) => {
       const anyChecked = radios.some(r => r.checked);
       if (!anyChecked) {
         radios.forEach(r => {
-          r.closest('.co-radio-option').style.borderColor = '#c0392b';
+          r.closest('.co-radio-option').style.borderColor = '#C0392B';
         });
         valid = false;
       }
     });
+
     return valid;
   }
 
@@ -960,7 +1287,6 @@
     const fd = new FormData(form);
     const obj = {};
     fd.forEach((val, key) => { obj[key] = val; });
-    // Capture unchecked checkboxes as false
     form.querySelectorAll('input[type="checkbox"]').forEach(cb => {
       if (!(cb.name in obj)) obj[cb.name] = false;
       else obj[cb.name] = true;
@@ -996,8 +1322,15 @@
     const submitBtn    = overlay.querySelector('#co-submit-btn');
     const errorDiv     = overlay.querySelector('#co-form-error');
     const successDiv   = overlay.querySelector('#co-success');
+    const modalHeader  = overlay.querySelector('#co-modal-header');
+    const modalTitle   = overlay.querySelector('#co-title');
+    const modalSub     = overlay.querySelector('.co-sub');
 
     function openModal() {
+      // Reset header to default options state
+      modalTitle.textContent = 'How would you like to Pay';
+      modalSub.textContent = 'Choose your preferred payment method';
+
       overlay.classList.add('active');
       optionsPanel.classList.remove('hidden');
       formPanel.classList.remove('active');
@@ -1016,12 +1349,16 @@
       formPanel.classList.add('active');
 
       if (type === 'aged_care') {
-        formHeading.textContent = '🏠 Government & Aged Care Order Request';
-        formSubtitle.textContent = 'We work with Support at Home, HCP, DVA, SWEP and state-based programs.';
+        modalTitle.textContent = 'Government & Aged Care Order';
+        modalSub.textContent = 'Support at Home, HCP, DVA, SWEP and state-based programs.';
+        formHeading.textContent = 'Complete your order request below';
+        formSubtitle.textContent = 'We specialise in supporting funded participants, care coordinators and providers.';
         formFields.innerHTML = AGED_CARE_FIELDS;
         bindAgedCareConditionals(formFields);
       } else {
-        formHeading.textContent = '♿ NDIS Order Request';
+        modalTitle.textContent = 'NDIS Order Request';
+        modalSub.textContent = 'Plan Managed, Self Managed — we\'ll handle invoicing for your plan.';
+        formHeading.textContent = 'Complete your order request below';
         formSubtitle.textContent = 'We specialise in supporting NDIS participants, Support Coordinators and Plan Managers.';
         formFields.innerHTML = NDIS_FIELDS;
         bindNdisConditionals(formFields);
@@ -1052,6 +1389,8 @@
     overlay.querySelector('#co-agedcare').addEventListener('click', () => showForm('aged_care'));
     overlay.querySelector('#co-ndis').addEventListener('click', () => showForm('ndis'));
     overlay.querySelector('#co-back').addEventListener('click', () => {
+      modalTitle.textContent = 'How would you like to Pay';
+      modalSub.textContent = 'Choose your preferred payment method';
       optionsPanel.classList.remove('hidden');
       formPanel.classList.remove('active');
     });
@@ -1071,7 +1410,6 @@
         await submitForm(currentFormType, data, cartData);
         form.style.display = 'none';
         successDiv.style.display = 'block';
-        // Clear Shopify cart
         await fetch('/cart/clear.js', { method: 'POST' });
       } catch (err) {
         errorDiv.textContent = 'Something went wrong. Please try again or contact us directly.';
@@ -1087,4 +1425,4 @@
   } else {
     init();
   }
-})()
+})();
