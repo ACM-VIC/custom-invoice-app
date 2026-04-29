@@ -76,12 +76,12 @@ function buildEmailHtml({ formType, formData, draftOrder }) {
       <style>
         body { font-family: Arial, sans-serif; font-size: 15px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
         .wrap { max-width: 560px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
-        .header { background: #1a1a1a; color: #fff; padding: 28px 32px; }
+        .header { background: #DC4E00; color: #fff; padding: 28px 32px; }
         .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
         .header p  { margin: 6px 0 0; font-size: 14px; opacity: .75; }
         .body { padding: 28px 32px; }
         .body p { line-height: 1.6; margin: 0 0 14px; }
-        .highlight { background: #f9f9f9; border-left: 3px solid #1a1a1a; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 14px; }
+        .highlight { background: #f9f9f9; border-left: 3px solid #DC4E00; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 14px; }
         .highlight strong { display: block; margin-bottom: 4px; font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: .5px; }
         .footer { background: #f5f5f5; padding: 18px 32px; font-size: 12px; color: #888; text-align: center; }
       </style>

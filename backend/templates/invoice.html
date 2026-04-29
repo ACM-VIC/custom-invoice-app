@@ -11,7 +11,7 @@
 
 
     :root {
-      --accent: #E8440A;
+      --accent: {{#if isNdis}}#84164E{{else}}#DC4E00{{/if}};
       --sidebar-w: 38px;
       --text-dark: #1a1a1a;
       --text-mid: #555555;
@@ -166,7 +166,7 @@
       font-family: 'Montserrat', sans-serif;
     }
     .party-dot {
-      width: 10px; height: 10px;
+      width: 5px; height: 20px;
       background: var(--accent);
       border-radius: 2px;
       flex-shrink: 0;
@@ -318,7 +318,6 @@
 
   <!-- SIDEBAR -->
   <div class="sidebar">
-    <span class="sidebar-text">
       {{#if isNdis}}NDIS INVOICE{{else}}AGED CARE &amp; MEDICAL INVOICE{{/if}}
     </span>
   </div>
@@ -374,7 +373,8 @@
       <div class="party-box">
         <div class="party-title"><span class="party-dot"></span> Deliver To</div>
         <div class="party-content">
-          <strong>{{deliverTo.address}}</strong>
+          <strong> {{deliverTo.name}}</strong>
+          {{deliverTo.address}}
           {{#if deliverTo.phone}}<br>{{deliverTo.phone}}{{/if}}
         </div>
       </div>
@@ -416,10 +416,14 @@
             <div class="service-field-label">Client ID</div>
             <div class="service-field-value">{{agedCare.clientId}}</div>
           </div>
-          <div>
+
+
+          <!--<div>
             <div class="service-field-label">Care Level</div>
             <div class="service-field-value">{{agedCare.packageLevel}}</div>
-          </div>
+          </div>-->
+
+          
           <div>
             <div class="service-field-label">Funding Type</div>
             <div class="service-field-value">{{agedCare.fundingType}}</div>
@@ -495,11 +499,11 @@
       </div>
     </div>
 
-    {{#if gstNote}}
+   <!-- {{#if gstNote}}
     <div class="gst-note">{{gstNote}}</div>
-    {{/if}}
+    {{/if}} -->
 
-    <!-- PAYMENT DETAILS -->
+   <!-- PAYMENT DETAILS 
     {{#if bankName}}
     <div class="payment-details">
       <strong>Payment Details</strong>
@@ -508,7 +512,7 @@
       {{#if bsb}}BSB: {{bsb}}<br>{{/if}}
       {{#if accountNumber}}Account Number: {{accountNumber}}{{/if}}
     </div>
-    {{/if}}
+    {{/if}}-->
 
     <!-- NOTES -->
     {{#if customerNotes}}
@@ -520,7 +524,7 @@
 
     <!-- FOOTER -->
     <div class="footer">
-      Thank you for choosing {{storeName}}. Please quote invoice {{invoiceNumber}} for all payments.
+      Thank you for choosing {{storeName}}. Please include invoice number: {{invoiceNumber}} for all payments.
     </div>
 
   </div>

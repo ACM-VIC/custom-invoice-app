@@ -130,6 +130,7 @@ async function generateInvoice({ formType, formData, draftOrder }) {
 
   // ── Deliver-To block ───────────────────────────────────────────────────────
   const deliverTo = {
+    name: participantName || '',
     address: [
       formData.address_line1,
       `${formData.suburb || ''} ${formData.state || ''} ${formData.postcode || ''}`.trim(),
@@ -201,7 +202,6 @@ async function generateInvoice({ formType, formData, draftOrder }) {
     subtotal:  `$${subtotal}`,
     tax:       `$${tax}`,
     total:     `$${total}`,
-    gstNote:   `GST included in total: $${tax}`,
 
     // Customer notes
     customerNotes: formData.notes || '',
