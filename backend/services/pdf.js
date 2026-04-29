@@ -101,6 +101,17 @@ async function generateInvoice({ formType, formData, draftOrder }) {
   const tax      = parseFloat(draftOrder.total_tax       || 0).toFixed(2);
   const total    = parseFloat(draftOrder.total_price     || 0).toFixed(2);
 
+  // ── Shipping ───────────────────────────────────────────────────────────────
+  // Pulled directly from Shopify's draft order response — never hardcoded.
+  // shipping_line is null when shipping is free or not applicable.
+  const shippingLine   = draftOrder.shipping_line || null;
+  const shippingTitle  = shippingLine?.title || 'Shipping';
+  const shippingAmount = shippingLine
+    ? parseFloat(shippingLine.price || 0).toFixed(2)
+    : null;
+
+  console.log('[DEBUG] shipping_line:', JSON.stringify(shippingLine, null, 2));
+
   // ── Resolve participant / client name ──────────────────────────────────────
   const participantName =
     formData.participant_full_name ||
@@ -141,7 +152,7 @@ async function generateInvoice({ formType, formData, draftOrder }) {
 
   // ── NDIS-specific fields ───────────────────────────────────────────────────
   const ndisData = formType === 'ndis' ? {
-    name:            participantName      || '', 
+    name:            participantName      || '',
     number:          formData.ndis_number          || '',
     supportCategory: formData.support_category     || '',
     fundingType:     (formData.ndis_funding_type   || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
@@ -202,6 +213,12 @@ async function generateInvoice({ formType, formData, draftOrder }) {
     subtotal:  `$${subtotal}`,
     tax:       `$${tax}`,
     total:     `$${total}`,
+
+    // ── Shipping — from Shopify draft order, never hardcoded ──────────────
+    // shipping is null when free/not applicable; the template hides the row.
+    shipping: shippingAmount !== null
+      ? { title: shippingTitle, amount: `$${shippingAmount}` }
+      : null,
 
     // Customer notes
     customerNotes: formData.notes || '',

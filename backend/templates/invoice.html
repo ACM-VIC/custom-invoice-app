@@ -48,7 +48,7 @@
     .sidebar {
       flex-shrink: 0;
       width: var(--sidebar-w);
-      background: transparent; /* ← changed */
+      background: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -425,14 +425,6 @@
             <div class="service-field-label">Client ID</div>
             <div class="service-field-value">{{agedCare.clientId}}</div>
           </div>
-
-
-          <!--<div>
-            <div class="service-field-label">Care Level</div>
-            <div class="service-field-value">{{agedCare.packageLevel}}</div>
-          </div>-->
-
-          
           <div>
             <div class="service-field-label">Funding Type</div>
             <div class="service-field-value">{{agedCare.fundingType}}</div>
@@ -492,10 +484,20 @@
           <span class="value">{{poNumber}}</span>
         </div>
         {{/if}}
+
         <div class="totals-row">
           <span class="label">Subtotal</span>
           <span class="value">{{subtotal}}</span>
         </div>
+
+        {{!-- Shipping row — only shown when Shopify returns a shipping_line --}}
+        {{#if shipping}}
+        <div class="totals-row">
+          <span class="label">{{shipping.title}}</span>
+          <span class="value">{{shipping.amount}}</span>
+        </div>
+        {{/if}}
+
         <div class="totals-row">
           <span class="label">GST (10%)</span>
           <span class="value">{{tax}}</span>
@@ -507,21 +509,6 @@
         </div>
       </div>
     </div>
-
-   <!-- {{#if gstNote}}
-    <div class="gst-note">{{gstNote}}</div>
-    {{/if}} -->
-
-   <!-- PAYMENT DETAILS 
-    {{#if bankName}}
-    <div class="payment-details">
-      <strong>Payment Details</strong>
-      Bank: {{bankName}}<br>
-      {{#if accountName}}Account Name: {{accountName}}<br>{{/if}}
-      {{#if bsb}}BSB: {{bsb}}<br>{{/if}}
-      {{#if accountNumber}}Account Number: {{accountNumber}}{{/if}}
-    </div>
-    {{/if}}-->
 
     <!-- NOTES -->
     {{#if customerNotes}}
