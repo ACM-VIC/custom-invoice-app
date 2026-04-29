@@ -114,8 +114,8 @@ function buildEmailHtml({ formType, formData, draftOrder }) {
           </div>
           ` : `
           <div class="highlight">
-            <strong>Aged Care package level</strong>
-            ${formData.package_level}
+              <strong>Funding Type</strong>
+              ${(formData.ac_funding_type || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
           </div>
           `}
 
