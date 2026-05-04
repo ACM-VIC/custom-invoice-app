@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "express": "^5.2.1",
     "handlebars": "^4.7.9",
     "puppeteer": "^24.41.0"
   }

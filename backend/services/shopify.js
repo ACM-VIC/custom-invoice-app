@@ -103,8 +103,6 @@ function buildNote(formType, formData) {
  * @returns {Object} The created draft order object from Shopify
  */
 async function createDraftOrder({ formType, formData, cart }) {
-  // FIX: Validate config at call time so missing env vars throw a clear error
-  // rather than a confusing "fetch failed: https://undefined/..." error.
   const { baseUrl, accessToken } = getConfig();
 
   const lineItems = mapLineItems(cart.items);
@@ -129,19 +127,29 @@ async function createDraftOrder({ formType, formData, cart }) {
       shipping_address: shippingAddress,
       billing_address:  shippingAddress,
       note:             buildNote(formType, formData),
+
+      // ✅ Shipping from Calcurates via cart — only added when available
+      ...(formData.shipping_price ? {
+        shipping_line: {
+          title:  formData.shipping_title || 'Shipping',
+          price:  formData.shipping_price,
+          custom: true,
+        }
+      } : {}),
+
       note_attributes: [
         { name: 'billing_type', value: formType === 'aged_care' ? 'Aged Care' : 'NDIS' },
         { name: 'submitted_at', value: new Date().toISOString() },
         ...(formType === 'ndis' ? [
-          { name: 'ndis_number',   value: formData.ndis_number    || '' },
-          { name: 'provider_name', value: formData.provider_name  || '' },
-          { name: 'provider_email',value: formData.provider_email || '' },
+          { name: 'ndis_number',    value: formData.ndis_number    || '' },
+          { name: 'provider_name',  value: formData.provider_name  || '' },
+          { name: 'provider_email', value: formData.provider_email || '' },
         ] : [
           { name: 'package_level', value: formData.package_level  || '' },
           { name: 'provider_name', value: formData.provider_name  || '' },
         ]),
       ],
-      tags:                        formType === 'aged_care' ? 'aged-care-invoice' : 'ndis-invoice',
+      tags:                         formType === 'aged_care' ? 'aged-care-invoice' : 'ndis-invoice',
       use_customer_default_address: false,
     }
   };
