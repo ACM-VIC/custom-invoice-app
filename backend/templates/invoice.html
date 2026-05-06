@@ -302,7 +302,7 @@
       margin-top: 20px;
       font-size: 11px;
       color: var(--text-mid);
-      background: #f35f0a34;
+      background: #fab58d34;
     }
     .footer {
       margin-top: auto;
@@ -369,26 +369,42 @@
       </div>
     </div>
 
-    <!-- BILL TO / DELIVER TO -->
-    <div class="parties">
-      <div class="party-box">
-        <div class="party-title"><span class="party-dot"></span> Bill To</div>
-        <div class="party-content">
-          <strong>{{billTo.name}}</strong>
-          {{#if billTo.address}}{{billTo.address}}<br>{{/if}}
-          {{#if billTo.email}}{{billTo.email}}<br>{{/if}}
-          {{#if billTo.phone}}{{billTo.phone}}{{/if}}
-        </div>
-      </div>
-      <div class="party-box">
-        <div class="party-title"><span class="party-dot"></span> Deliver To</div>
-        <div class="party-content">
-          <strong> {{deliverTo.name}}</strong>
-          {{deliverTo.address}}
-          {{#if deliverTo.phone}}<br>{{deliverTo.phone}}{{/if}}
-        </div>
-      </div>
+<!-- BILL TO / DELIVER TO -->
+<div class="parties">
+  <!-- BILL TO: Changes based on NDIS status -->
+  <div class="party-box">
+    <div class="party-title"><span class="party-dot"></span> 
+      {{#if isNdis}}Payable By (Plan Manager){{else}}Bill To{{/if}}
     </div>
+    <div class="party-content">
+      {{#if isNdis}}
+        <strong>{{ndis.providerName}}</strong>
+        {{#if ndis.providerEmail}}Email: {{ndis.providerEmail}}<br>{{/if}}
+        {{#if billTo.address}}{{billTo.address}}{{/if}}
+      {{else}}
+        <strong>{{billTo.name}}</strong>
+        {{#if billTo.address}}{{billTo.address}}<br>{{/if}}
+        {{#if billTo.email}}{{billTo.email}}<br>{{/if}}
+        {{#if billTo.phone}}{{billTo.phone}}{{/if}}
+      {{/if}}
+    </div>
+  </div>
+
+  <!-- DELIVER TO: Participant details for NDIS -->
+  <div class="party-box">
+    <div class="party-title"><span class="party-dot"></span> 
+      {{#if isNdis}}NDIS Participant / Deliver To{{else}}Deliver To{{/if}}
+    </div>
+    <div class="party-content">
+      <strong>{{deliverTo.name}}</strong>
+      {{#if isNdis}}
+        <div style="font-size: 11px; color: var(--accent); margin-bottom: 4px;">NDIS #: {{ndis.number}}</div>
+      {{/if}}
+      {{deliverTo.address}}
+      {{#if deliverTo.phone}}<br>{{deliverTo.phone}}{{/if}}
+    </div>
+  </div>
+</div>
 
     <!-- SERVICE BOX — rendered server-side by Handlebars, no JS needed -->
     <div class="service-box">
@@ -520,15 +536,19 @@
     {{/if}}
     <br><br>
 
-    <!-- BANK DETAILS-->
-     <div class="bank details"></div>
-      <span class="label"; style="font-style: bold; font-weight:bolder; font-style:initial; color:#7e7b7b; font-size: 14px;">BANK DETAILS</span>
-      <span class="label"; style="font-style: italic; color:#7e7b7b; font-size: 14px;">Bank Name: The Commonwealthh Bank of Australia </span>
-      <span class="label"; style="font-style: italic; color:#7e7b7b; font-size: 14px;">Account Name: Aged Care and Medical</span>
-      <span class="label"; style="font-style: italic; color:#7e7b7b; font-size: 14px;">Bank Account Number: 1036 6880</span>
-      <span class="label"; style="font-style: italic; color:#7e7b7b; font-size: 14px;">BSB: 063-145</span>
-      <span class="label"; style="font-style: italic; color:#7e7b7b; font-size: 14px;">Email Remittance to: accounts@agedcareandmedical.com.au</span>
-      
+<!-- BANK DETAILS -->
+<div class="payment-details" style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed var(--grey-line);">
+    <strong style="color: var(--text-dark); font-family: 'Montserrat'; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Bank Details</strong>
+    <div style="margin-top: 8px; line-height: 1.6; color: var(--text-mid);">
+        <div><span style="font-weight: 600;">Bank Name:</span> Commonwealth Bank of Australia</div>
+        <div><span style="font-weight: 600;">Account Name:</span> Aged Care and Medical</div>
+        <div><span style="font-weight: 600;">BSB:</span> 063-145</div>
+        <div><span style="font-weight: 600;">Account Number:</span> 1036 6880</div>
+        <div style="margin-top: 8px; font-style: italic; font-size: 10px;">
+            Email Remittance to: accounts@agedcareandmedical.com.au
+        </div>
+    </div>
+</div>  
 
       
 
