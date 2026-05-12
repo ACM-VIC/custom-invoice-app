@@ -361,14 +361,9 @@ async function handleSubmitOrder(req, res) {
     return res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 }
+const express = require('express');
+const router = express.Router();
 
-module.exports = {
-  handleSubmitOrder,
-  createShopifyDraftOrder,
-  buildPdfShippingRow,
-  buildPdfTotals,
-  buildShopifyShippingLine,
-  buildLineItems,
-  buildShippingAddress,
-  buildNoteAttributes,
-};
+router.post( '/submit-order', handleSubmitOrder);
+
+modules.exports = router;

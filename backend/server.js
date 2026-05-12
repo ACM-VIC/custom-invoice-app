@@ -32,15 +32,14 @@
  * DO NOT TOUCH
  * -----------------------------------------
  * - express.json middleware (required for API body parsing)
- * - route registration: app.use('/api', orderRoute)
+ * - route registration: app.post('/api/submit-order', handleSubmitOrder)
  */
-
 require('dotenv').config();
-const express    = require('express');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const rateLimit  = require('express-rate-limit');
-const orderRoute = require('./routes/submit-order');
+const express               = require('express');
+const cors                  = require('cors');
+const helmet                = require('helmet');
+const rateLimit             = require('express-rate-limit');
+const { handleSubmitOrder } = require('./routes/submit-order');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -82,7 +81,8 @@ app.use('/api/', rateLimit({
 app.use(express.json({ limit: '2mb' }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api', orderRoute);
+app.post('/api/submit-order', handleSubmitOrder);
+
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // ── Start ─────────────────────────────────────────────────────────────────────
