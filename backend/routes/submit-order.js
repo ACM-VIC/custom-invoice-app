@@ -2,128 +2,199 @@
  * submit-order.js  —  Backend handler for NDIS / Aged Care order submissions
  *
  * What this module does:
- *  1. Receives the form payload (formData, cart, shipping_line) from the frontend
- *  2. Creates a Shopify Draft Order with:
- *       - line_items  from cart
- *       - shipping_address from form
- *       - shipping_line  (title + price) calculated by the frontend
- *  3. Passes the same shipping data to the PDF generator so it appears
- *     on the invoice as a dedicated line item
+ *  1. Receives the form payload (formData, cart) from the frontend
+ *  2. Extracts shipping details from formData fields set by the shipping module
+ *  3. Creates a Shopify Draft Order with line_items, shipping_address, shipping_line
+ *  4. Passes shipping data to the PDF generator so it appears on the invoice
+ *  5. Sends the confirmation email
  *
  * ─── ENVIRONMENT VARIABLES REQUIRED ─────────────────────────────────────────
- *  SHOPIFY_STORE_DOMAIN   e.g. your-store.myshopify.com
+ *  SHOPIFY_STORE_DOMAIN   e.g. your-store.myshopify.com   ← must NOT include https://
  *  SHOPIFY_ADMIN_TOKEN    Admin API access token (write_draft_orders scope)
- *  SHOPIFY_API_VERSION    e.g. 2024-01
+ *  SHOPIFY_API_VERSION    e.g. 2024-01  (falls back to '2024-01' if missing)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 'use strict';
 
+const express = require('express');
+const router  = express.Router();
+
+// ─── ENV VARIABLES ────────────────────────────────────────────────────────────
 const SHOPIFY_DOMAIN  = process.env.SHOPIFY_STORE_DOMAIN;
 const SHOPIFY_TOKEN   = process.env.SHOPIFY_ADMIN_TOKEN;
 const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
 
-// ─── SHOPIFY DRAFT ORDER ──────────────────────────────────────────────────────
+// ─── STARTUP GUARD ────────────────────────────────────────────────────────────
+// Log a clear warning at startup if required env vars are missing.
+// This shows up in your Azure log stream immediately on deploy —
+// much easier to spot than a cryptic ENOTFOUND error at runtime.
+if (!SHOPIFY_DOMAIN) {
+  console.error(
+    '[submit-order] ⚠️  SHOPIFY_STORE_DOMAIN is not set. ' +
+    'Shopify draft order creation will be skipped until this is configured. ' +
+    'Set it in Azure Portal → App Service → Configuration → Application Settings.'
+  );
+}
+if (!SHOPIFY_TOKEN) {
+  console.error(
+    '[submit-order] ⚠️  SHOPIFY_ADMIN_TOKEN is not set. ' +
+    'Shopify draft order creation will be skipped until this is configured.'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ██  SHIPPING LINE BUILDER  ██
+//
+//  The frontend (checkout-modal.js) no longer sends a separate shipping_line
+//  object. Instead it injects these fields directly into formData:
+//
+//    shipping_category        raw key:  'small' | 'medium' | 'large' | 'bulky'
+//    shipping_category_label  display:  'Small (S)', 'Medium (M)', etc.
+//    shipping_zone            raw key:  'local' | 'metro' | 'north_west'
+//    shipping_zone_label      display:  'Local (Inner Melbourne)', etc.
+//    shipping_price           decimal string: '10.00' | '25.00' | 'quote'
+//    shipping_price_display   formatted: '$10.00' | 'Manual Quote'
+//    shipping_title           line item: 'Shipping — Medium (M) (Melbourne Metro)'
+//    shipping_override_notes  free text for bulky/freight orders
+//
+//  extractShippingLine() reads those fields and returns a normalised object
+//  that the rest of this file uses. Nothing else needs to know about the
+//  field names — change them here if the frontend ever changes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Extract and normalise shipping details from the submitted formData.
+ *
+ * @param {object} formData  Raw form fields from the frontend
+ * @returns {{
+ *   title:          string,
+ *   price:          number | 'quote' | null,
+ *   priceDisplay:   string,
+ *   category:       string,
+ *   categoryLabel:  string,
+ *   zone:           string,
+ *   zoneLabel:      string,
+ *   isQuote:        boolean,
+ *   overrideNotes:  string,
+ * }}
+ */
+function extractShippingLine(formData) {
+  const rawPrice    = formData.shipping_price;           // '10.00' | 'quote' | ''
+  const isQuote     = rawPrice === 'quote';
+  const priceNumber = (!rawPrice || isQuote)
+    ? null
+    : parseFloat(rawPrice);
+
+  return {
+    title:         formData.shipping_title         || 'Delivery',
+    price:         isQuote ? 'quote' : priceNumber,
+    priceDisplay:  formData.shipping_price_display  || (isQuote ? 'Manual Quote' : 'TBC'),
+    category:      formData.shipping_category       || '',
+    categoryLabel: formData.shipping_category_label || '',
+    zone:          formData.shipping_zone           || '',
+    zoneLabel:     formData.shipping_zone_label     || '',
+    isQuote,
+    overrideNotes: formData.shipping_override_notes || '',
+  };
+}
+
+
+// ─── SHOPIFY HELPERS ──────────────────────────────────────────────────────────
 
 /**
  * Build the shipping_line object for the Shopify Draft Order API.
- * If shipping is free, we still send a line with price 0 so it appears
- * on the draft order and PDF rather than being invisible.
- *
- * @param {object} shippingLine  { title, price, total_kg }
- * @returns {object}  Shopify shipping_line payload, or null if not calculable
+ * Bulky/quote orders send price 0 with a note — staff update it after quoting.
+ * Returns null if shipping details are missing entirely.
  */
-function buildShopifyShippingLine(shippingLine) {
-  if (!shippingLine || shippingLine.price === null || shippingLine.price === undefined) {
-    return null;
-  }
+function buildShopifyShippingLine(shipping) {
+  if (!shipping || shipping.price === null) return null;
+
+  // For manual quotes, send $0 so the draft order is created successfully.
+  // Staff will update the price in Shopify after confirming the freight cost.
+  const priceValue = (shipping.isQuote || shipping.price === 'quote')
+    ? '0.00'
+    : Number(shipping.price).toFixed(2);
 
   return {
-    title:            shippingLine.title || 'Delivery',
-    price:            shippingLine.price.toFixed(2),
-    // custom: true tells Shopify this is a manually-set shipping rate
-    custom:           true,
+    title:  shipping.title || 'Delivery',
+    price:  priceValue,
+    custom: true,
   };
 }
 
 /**
- * Map Shopify cart items to Shopify Draft Order line_items.
- * cart.items entries already contain variant_id, quantity, price (cents).
- *
- * @param {Array} cartItems
- * @returns {Array}
+ * Map Shopify cart items → Shopify Draft Order line_items.
+ * cart.items entries contain variant_id, quantity, price (cents).
  */
 function buildLineItems(cartItems) {
   if (!cartItems || !cartItems.length) return [];
-
   return cartItems.map(item => ({
     variant_id: item.variant_id,
     quantity:   item.quantity,
-    // price in dollars (Shopify cart uses cents)
     price:      (item.price / 100).toFixed(2),
     title:      item.product_title || item.title,
   }));
 }
 
 /**
- * Build the shipping address from the submitted form data.
+ * Build the shipping address from submitted form fields.
  * Both NDIS and Aged Care forms share the same address field names.
- *
- * @param {object} formData
- * @param {string} formType  'ndis' | 'aged_care'
- * @returns {object}  Shopify address object
  */
 function buildShippingAddress(formData) {
+  const fullName  = formData.participant_full_name || '';
+  const nameParts = fullName.trim().split(' ');
   return {
-    first_name: (formData.participant_full_name || '').split(' ')[0] || '',
-    last_name:  (formData.participant_full_name || '').split(' ').slice(1).join(' ') || '',
+    first_name: nameParts[0] || '',
+    last_name:  nameParts.slice(1).join(' ') || '',
     address1:   formData.address_line1 || '',
-    city:       formData.suburb || '',
-    province:   formData.state  || '',
-    zip:        formData.postcode || '',
+    city:       formData.suburb        || '',
+    province:   formData.state         || '',
+    zip:        formData.postcode      || '',
     country:    'AU',
     phone:      formData.delivery_phone || formData.submitter_phone || '',
   };
 }
 
 /**
- * Build note_attributes array for the draft order.
- * These appear in the Shopify order as named attributes and are
- * also available for order printer / invoice templates.
- *
- * @param {string} formType
- * @param {object} formData
- * @param {object} shippingLine
- * @returns {Array}  [{ name, value }]
+ * Build note_attributes for the draft order.
+ * These appear in Shopify's order view and are available in invoice templates.
  */
-function buildNoteAttributes(formType, formData, shippingLine) {
+function buildNoteAttributes(formType, formData, shipping) {
+  const priceNote = shipping.isQuote
+    ? 'Manual Quote Required'
+    : (shipping.price !== null ? `$${Number(shipping.price).toFixed(2)}` : 'TBC');
+
   const attrs = [
-    { name: 'Form Type',           value: formType === 'ndis' ? 'NDIS' : 'Aged Care / Government' },
-    { name: 'Submitter Name',      value: formData.submitter_full_name || '' },
-    { name: 'Submitter Email',     value: formData.submitter_email || '' },
-    { name: 'Submitter Phone',     value: formData.submitter_phone || '' },
-    { name: 'Participant Name',    value: formData.participant_full_name || '' },
-    { name: 'Delivery Suburb',     value: formData.suburb || '' },
-    { name: 'Delivery State',      value: formData.state || '' },
-    { name: 'Delivery Postcode',   value: formData.postcode || '' },
-    { name: 'Shipping Method',     value: shippingLine?.title || 'To be arranged' },
-    { name: 'Shipping Fee',        value: shippingLine?.price !== null && shippingLine?.price !== undefined
-                                          ? (shippingLine.price === 0 ? 'FREE' : `$${Number(shippingLine.price).toFixed(2)}`)
-                                          : 'Contact required' },
-    { name: 'Total Weight (kg)',   value: shippingLine?.total_kg ? `${Number(shippingLine.total_kg).toFixed(2)} kg` : 'N/A' },
+    { name: 'Form Type',            value: formType === 'ndis' ? 'NDIS' : 'Aged Care / Government' },
+    { name: 'Submitter Name',       value: formData.submitter_full_name  || '' },
+    { name: 'Submitter Email',      value: formData.submitter_email      || '' },
+    { name: 'Submitter Phone',      value: formData.submitter_phone      || '' },
+    { name: 'Participant Name',     value: formData.participant_full_name || '' },
+    { name: 'Delivery Suburb',      value: formData.suburb               || '' },
+    { name: 'Delivery State',       value: formData.state                || '' },
+    { name: 'Delivery Postcode',    value: formData.postcode             || '' },
+    { name: 'Shipping Category',    value: shipping.categoryLabel        || '' },
+    { name: 'Delivery Zone',        value: shipping.zoneLabel            || '' },
+    { name: 'Shipping Method',      value: shipping.title                || '' },
+    { name: 'Shipping Fee',         value: priceNote                        },
   ];
+
+  if (shipping.overrideNotes) {
+    attrs.push({ name: 'Freight Notes', value: shipping.overrideNotes });
+  }
 
   // NDIS-specific
   if (formType === 'ndis') {
     attrs.push(
-      { name: 'Funding Type',      value: formData.ndis_funding_type || '' },
-      { name: 'NDIS Number',       value: formData.ndis_number || '' },
-      { name: 'Submitter Role',    value: formData.ndis_submitter_role || '' },
+      { name: 'Funding Type',   value: formData.ndis_funding_type    || '' },
+      { name: 'NDIS Number',    value: formData.ndis_number          || '' },
+      { name: 'Submitter Role', value: formData.ndis_submitter_role  || '' },
     );
     if (formData.ndis_funding_type === 'plan_managed') {
       attrs.push(
-        { name: 'Plan Manager',    value: formData.plan_manager_company || '' },
-        { name: 'Plan Mgr Email',  value: formData.plan_manager_email || '' },
+        { name: 'Plan Manager',   value: formData.plan_manager_company || '' },
+        { name: 'Plan Mgr Email', value: formData.plan_manager_email   || '' },
       );
     }
   }
@@ -131,9 +202,9 @@ function buildNoteAttributes(formType, formData, shippingLine) {
   // Aged Care-specific
   if (formType === 'aged_care') {
     attrs.push(
-      { name: 'Funding Program',   value: formData.ac_funding_type || '' },
-      { name: 'Submitter Role',    value: formData.ac_submitter_role || '' },
-      { name: 'Client Reference',  value: formData.client_reference || '' },
+      { name: 'Funding Program', value: formData.ac_funding_type   || '' },
+      { name: 'Submitter Role',  value: formData.ac_submitter_role || '' },
+      { name: 'Client Reference',value: formData.client_reference  || '' },
     );
   }
 
@@ -141,58 +212,63 @@ function buildNoteAttributes(formType, formData, shippingLine) {
     attrs.push({ name: 'Notes', value: formData.notes });
   }
 
-  return attrs.filter(a => a.value !== '');
+  // Filter out any empty values to keep the draft order tidy
+  return attrs.filter(a => a.value && a.value.trim() !== '');
 }
 
 /**
  * Create a Shopify Draft Order via the Admin API.
- *
- * @param {object} params
- * @param {string} params.formType
- * @param {object} params.formData
- * @param {object} params.cart
- * @param {object} params.shippingLine   { title, price, total_kg }
- * @returns {Promise<object>}  The created draft_order object from Shopify
+ * Returns the created draft_order object, or throws on failure.
  */
-async function createShopifyDraftOrder({ formType, formData, cart, shippingLine }) {
+async function createShopifyDraftOrder({ formType, formData, cart, shipping }) {
+  // Guard: skip if env vars aren't configured
+  if (!SHOPIFY_DOMAIN || !SHOPIFY_TOKEN) {
+    throw new Error(
+      'Shopify env vars not configured — set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN in Azure Application Settings.'
+    );
+  }
+
   const lineItems       = buildLineItems(cart.items);
   const shippingAddress = buildShippingAddress(formData);
-  const noteAttributes  = buildNoteAttributes(formType, formData, shippingLine);
-  const shopifyShipping = buildShopifyShippingLine(shippingLine);
+  const noteAttributes  = buildNoteAttributes(formType, formData, shipping);
+  const shopifyShipping = buildShopifyShippingLine(shipping);
 
   const draftOrderPayload = {
     draft_order: {
-      line_items:        lineItems,
-      shipping_address:  shippingAddress,
-      billing_address:   shippingAddress,
-      note_attributes:   noteAttributes,
-      note:              formData.notes || '',
-      email:             formData.submitter_email || '',
-      phone:             formData.submitter_phone || '',
-      tags:              [
+      line_items:       lineItems,
+      shipping_address: shippingAddress,
+      billing_address:  shippingAddress,
+      note_attributes:  noteAttributes,
+      note:             formData.notes || '',
+      email:            formData.submitter_email || '',
+      phone:            formData.submitter_phone || '',
+      tags: [
         formType === 'ndis' ? 'NDIS' : 'Aged Care',
         formData.ndis_funding_type || formData.ac_funding_type || '',
         'Modal Order',
+        shipping.isQuote ? 'Freight Quote Needed' : '',
       ].filter(Boolean).join(', '),
-      // Apply the calculated shipping line if available
       ...(shopifyShipping && { shipping_line: shopifyShipping }),
     },
   };
 
+  // Build URL from env var — this is where ENOTFOUND was happening before
   const url = `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_VERSION}/draft_orders.json`;
+
+  console.log(`[submit-order] Creating Shopify draft order → ${url}`);
 
   const res = await fetch(url, {
     method:  'POST',
     headers: {
-      'Content-Type':              'application/json',
-      'X-Shopify-Access-Token':    SHOPIFY_TOKEN,
+      'Content-Type':           'application/json',
+      'X-Shopify-Access-Token': SHOPIFY_TOKEN,
     },
     body: JSON.stringify(draftOrderPayload),
   });
 
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
-    throw new Error(`Shopify draft order creation failed (${res.status}): ${errBody}`);
+    throw new Error(`Shopify API error (${res.status}): ${errBody}`);
   }
 
   const json = await res.json();
@@ -200,21 +276,15 @@ async function createShopifyDraftOrder({ formType, formData, cart, shippingLine 
 }
 
 
-// ─── PDF INVOICE — SHIPPING LINE HELPERS ─────────────────────────────────────
-//
-// Call these functions from your existing PDF generation module.
-// They return the data structure your PDF renderer expects for a line item row.
-//
+// ─── PDF HELPERS ──────────────────────────────────────────────────────────────
 
 /**
- * Build a shipping row object for the PDF invoice line items table.
- * Drop this into the same array as your product line items before rendering.
- *
- * @param {object} shippingLine  { title, price, total_kg }
- * @returns {object}  PDF line item row
+ * Build the shipping row object for the PDF invoice line items table.
+ * Pass this into your PDF generator alongside the product line items.
  */
-function buildPdfShippingRow(shippingLine) {
-  if (!shippingLine || shippingLine.price === null || shippingLine.price === undefined) {
+function buildPdfShippingRow(shipping) {
+  // No shipping info at all
+  if (!shipping || (shipping.price === null && !shipping.isQuote)) {
     return {
       sku:         '',
       description: 'Delivery — to be arranged',
@@ -226,108 +296,139 @@ function buildPdfShippingRow(shippingLine) {
     };
   }
 
-  const priceDisplay = shippingLine.price === 0
-    ? 'FREE'
-    : `$${Number(shippingLine.price).toFixed(2)}`;
+  // Manual quote (Bulky / Freight)
+  if (shipping.isQuote) {
+    return {
+      sku:         '',
+      description: `${shipping.title} — ${shipping.categoryLabel} (${shipping.zoneLabel})`,
+      qty:         1,
+      unit_price:  null,
+      total:       null,
+      display:     'Manual Quote',
+      is_shipping: true,
+      note:        shipping.overrideNotes
+                     ? `Freight notes: ${shipping.overrideNotes}`
+                     : 'Freight cost to be confirmed. Our team will contact you.',
+    };
+  }
 
-  const weightNote = shippingLine.total_kg
-    ? ` (${Number(shippingLine.total_kg).toFixed(2)} kg)`
-    : '';
-
+  // Standard calculated fee
+  const price = Number(shipping.price);
   return {
     sku:         '',
-    description: `${shippingLine.title || 'Delivery'}${weightNote}`,
+    description: `${shipping.title}`,
     qty:         1,
-    unit_price:  shippingLine.price === 0 ? 0 : Number(shippingLine.price),
-    total:       shippingLine.price === 0 ? 0 : Number(shippingLine.price),
-    display:     priceDisplay,
-    is_shipping: true,   // Use this flag in your PDF template to style differently if needed
-    note:        null,
+    unit_price:  price,
+    total:       price,
+    display:     shipping.priceDisplay || `$${price.toFixed(2)}`,
+    is_shipping: true,
+    note:        `${shipping.categoryLabel} · ${shipping.zoneLabel}`,
   };
 }
 
 /**
  * Build the invoice totals block for the PDF.
- * Returns subtotal, shipping, and grand total.
- *
- * @param {object} cart         Shopify cart object (total_price in cents)
- * @param {object} shippingLine { title, price, total_kg }
- * @returns {object}  { subtotal_cents, subtotal_display, shipping_display, grand_total_cents, grand_total_display }
+ * Returns subtotal, shipping fee and grand total — all formatted for display.
  */
-function buildPdfTotals(cart, shippingLine) {
-  const subtotalCents  = cart.total_price || 0;                 // cents
+function buildPdfTotals(cart, shipping) {
+  const subtotalCents  = cart.total_price || 0;
   const subtotalDollar = subtotalCents / 100;
 
-  const shippingDollar = (shippingLine && shippingLine.price !== null && shippingLine.price !== undefined)
-    ? Number(shippingLine.price)
+  // For quotes, grand total excludes shipping (TBC) — show subtotal only
+  const shippingDollar = (shipping && !shipping.isQuote && shipping.price !== null)
+    ? Number(shipping.price)
     : 0;
 
   const grandTotal = subtotalDollar + shippingDollar;
 
+  let shippingDisplay;
+  if (!shipping || shipping.price === null) {
+    shippingDisplay = 'TBC';
+  } else if (shipping.isQuote) {
+    shippingDisplay = 'Manual Quote — To Be Confirmed';
+  } else {
+    shippingDisplay = shipping.priceDisplay || `$${shippingDollar.toFixed(2)}`;
+  }
+
   return {
-    subtotal_cents:       subtotalCents,
-    subtotal_display:     `$${subtotalDollar.toFixed(2)}`,
-    shipping_price:       shippingDollar,
-    shipping_display:     shippingDollar === 0
-                            ? (shippingLine?.price === 0 ? 'FREE' : 'TBC')
-                            : `$${shippingDollar.toFixed(2)}`,
-    shipping_title:       shippingLine?.title || 'Delivery',
-    grand_total_cents:    Math.round(grandTotal * 100),
-    grand_total_display:  `$${grandTotal.toFixed(2)}`,
+    subtotal_cents:      subtotalCents,
+    subtotal_display:    `$${subtotalDollar.toFixed(2)}`,
+    shipping_price:      shippingDollar,
+    shipping_display:    shippingDisplay,
+    shipping_title:      shipping?.title    || 'Delivery',
+    shipping_category:   shipping?.categoryLabel || '',
+    shipping_zone:       shipping?.zoneLabel     || '',
+    // Grand total only includes shipping if it's a confirmed price
+    grand_total_cents:   Math.round(grandTotal * 100),
+    grand_total_display: shipping?.isQuote
+                           ? `$${subtotalDollar.toFixed(2)} + freight TBC`
+                           : `$${grandTotal.toFixed(2)}`,
   };
 }
 
 
 // ─── MAIN ROUTE HANDLER ───────────────────────────────────────────────────────
-//
-// Plug this into your Express / Azure Function / whatever framework you use.
-// Example for Express:
-//
-//   const { handleSubmitOrder } = require('./submit-order');
-//   app.post('/api/submit-order', express.json(), handleSubmitOrder);
-//
 
 /**
- * Main order submission handler.
+ * POST /api/submit-order
  *
  * Expected request body:
  * {
- *   formType:      'ndis' | 'aged_care',
- *   formData:      { ...form fields including shipping_price, shipping_title, shipping_total_kg },
- *   cart:          { items: [...], total_price: Number (cents), ... },
- *   shipping_line: { title: String, price: Number|null, total_kg: Number|null }
+ *   formType:  'ndis' | 'aged_care',
+ *   formData:  { ...all form fields, including shipping_* fields from the modal },
+ *   cart:      { items: [...], total_price: Number (cents) }
  * }
+ *
+ * NOTE: There is no longer a separate `shipping_line` property in the body.
+ * Shipping details are read directly from formData.shipping_* fields.
  */
 async function handleSubmitOrder(req, res) {
   try {
-    const { formType, formData, cart, shipping_line } = req.body;
+    const { formType, formData, cart } = req.body;
 
     if (!formType || !formData) {
       return res.status(400).json({ success: false, message: 'Missing formType or formData.' });
     }
 
-    // ── 1. Create Shopify Draft Order ─────────────────────────────────────────
+    // ── Step 1: Extract shipping from formData ────────────────────────────────
+    // This replaces the old `shipping_line` object that the frontend used to send.
+    const shipping = extractShippingLine(formData);
+
+    console.log('[submit-order] Shipping extracted:', {
+      category:  shipping.categoryLabel,
+      zone:      shipping.zoneLabel,
+      price:     shipping.priceDisplay,
+      isQuote:   shipping.isQuote,
+      title:     shipping.title,
+    });
+
+    // ── Step 2: Create Shopify Draft Order ────────────────────────────────────
     let draftOrder = null;
     try {
       draftOrder = await createShopifyDraftOrder({
         formType,
         formData,
-        cart:         cart || { items: [], total_price: 0 },
-        shippingLine: shipping_line,
+        cart:     cart || { items: [], total_price: 0 },
+        shipping,
       });
+      console.log(`[submit-order] Shopify draft order created: ${draftOrder.name} (${draftOrder.id})`);
     } catch (shopifyErr) {
-      console.error('[submit-order] Shopify draft order error:', shopifyErr);
-      // Don't block the whole submission if Shopify fails —
-      // fall through to PDF generation and flag in response.
+      // Log the real error clearly — don't swallow it silently
+      console.error('[submit-order] Shopify draft order failed:', shopifyErr.message);
+      // Continue to PDF + email even if Shopify fails,
+      // so the customer still gets a confirmation.
     }
 
-    // ── 2. Build PDF data ─────────────────────────────────────────────────────
-    // Pass these objects to your existing PDF generation function.
-    const pdfShippingRow = buildPdfShippingRow(shipping_line);
-    const pdfTotals      = buildPdfTotals(cart || { total_price: 0 }, shipping_line);
+    // ── Step 3: Build PDF data ────────────────────────────────────────────────
+    const pdfShippingRow = buildPdfShippingRow(shipping);
+    const pdfTotals      = buildPdfTotals(cart || { total_price: 0 }, shipping);
 
-    // ── 3. Generate PDF ───────────────────────────────────────────────────────
-    // Replace this block with your actual PDF generation call, e.g.:
+    console.log('[submit-order] PDF shipping row:', pdfShippingRow);
+    console.log('[submit-order] PDF totals:', pdfTotals);
+
+    // ── Step 4: Generate PDF + Send Email ─────────────────────────────────────
+    //
+    // Replace the block below with your actual PDF + email calls, e.g.:
     //
     //   const pdfBuffer = await generateInvoicePdf({
     //     formType,
@@ -337,22 +438,31 @@ async function handleSubmitOrder(req, res) {
     //     totals:      pdfTotals,
     //     draftOrder,
     //   });
-    //   await sendInvoiceEmail(formData.submitter_email, pdfBuffer, draftOrder);
     //
-    // The key additions are `shippingRow` and `totals` — pipe them into
-    // wherever your PDF template renders the line items table and totals block.
+    //   await sendInvoiceEmail({
+    //     to:          formData.submitter_email,
+    //     pdfBuffer,
+    //     draftOrder,
+    //     formData,
+    //     shippingRow: pdfShippingRow,
+    //     totals:      pdfTotals,
+    //   });
+    //
+    // The PDF template should render a shipping line item using pdfShippingRow,
+    // and a totals block using pdfTotals. See the comment at the bottom of
+    // this file for the exact field reference.
 
-    console.log('[submit-order] PDF shipping row:', pdfShippingRow);
-    console.log('[submit-order] PDF totals:', pdfTotals);
-
+    // ── Step 5: Respond ───────────────────────────────────────────────────────
     return res.json({
       success:          true,
-      draft_order_id:   draftOrder?.id || null,
+      draft_order_id:   draftOrder?.id   || null,
       draft_order_name: draftOrder?.name || null,
       shipping_applied: {
-        title:   shipping_line?.title || null,
-        price:   shipping_line?.price ?? null,
-        total_kg: shipping_line?.total_kg ?? null,
+        category:  shipping.categoryLabel,
+        zone:      shipping.zoneLabel,
+        title:     shipping.title,
+        price:     shipping.isQuote ? 'quote' : shipping.price,
+        display:   shipping.priceDisplay,
       },
     });
 
@@ -361,9 +471,43 @@ async function handleSubmitOrder(req, res) {
     return res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 }
-const express = require('express');
-const router = express.Router();
 
-router.post( '/submit-order', handleSubmitOrder);
-
+// ─── ROUTER ───────────────────────────────────────────────────────────────────
+router.post('/submit-order', handleSubmitOrder);
 module.exports = router;
+
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * PDF & EMAIL TEMPLATE FIELD REFERENCE
+ * ───────────────────────────────────────────────────────────────────────────────
+ *
+ * pdfShippingRow fields:
+ *   description   → line item label, e.g. "Shipping — Medium (M) (Melbourne Metro)"
+ *   unit_price    → number (dollars) or null for quotes
+ *   total         → same as unit_price
+ *   display       → formatted string: "$25.00" or "Manual Quote"
+ *   is_shipping   → true — use to style this row differently in the PDF template
+ *   note          → sub-line note, e.g. "Medium (M) · Melbourne Metro"
+ *                   or "Freight cost to be confirmed" for bulky orders
+ *
+ * pdfTotals fields:
+ *   subtotal_display     → "$3.95"
+ *   shipping_display     → "$25.00" | "Manual Quote — To Be Confirmed" | "TBC"
+ *   shipping_category    → "Medium (M)"
+ *   shipping_zone        → "Melbourne Metro"
+ *   grand_total_display  → "$28.95" | "$3.95 + freight TBC"
+ *
+ * Shopify Draft Order note_attributes include:
+ *   Shipping Category    → "Medium (M)"
+ *   Delivery Zone        → "Melbourne Metro"
+ *   Shipping Method      → "Shipping — Medium (M) (Melbourne Metro)"
+ *   Shipping Fee         → "$25.00" | "Manual Quote Required"
+ *   Freight Notes        → any override text for bulky orders
+ *
+ * Azure env vars to set (Portal → App Service → Configuration):
+ *   SHOPIFY_STORE_DOMAIN   your-store.myshopify.com   (no https://, no trailing slash)
+ *   SHOPIFY_ADMIN_TOKEN    shpat_xxxxxxxxxxxxxxxxxxxx
+ *   SHOPIFY_API_VERSION    2024-01
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
