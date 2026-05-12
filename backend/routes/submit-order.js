@@ -366,4 +366,4 @@ const router = express.Router();
 
 router.post( '/submit-order', handleSubmitOrder);
 
-modules.exports = router;
+module.exports = router;
