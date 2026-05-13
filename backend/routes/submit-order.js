@@ -30,10 +30,9 @@ const { generateInvoice }   = require('../services/pdf');    // Puppeteer + Hand
 const { sendInvoiceEmail }  = require('../services/email');  // Nodemailer
 
 // ─── ENV VARIABLES ────────────────────────────────────────────────────────────
-const SHOPIFY_DOMAIN  = process.env.SHOPIFY_STORE_DOMAIN;
-const SHOPIFY_TOKEN   = process.env.SHOPIFY_ADMIN_TOKEN;
+const SHOPIFY_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
+const SHOPIFY_TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
-
 // ─── STARTUP GUARD ────────────────────────────────────────────────────────────
 if (!SHOPIFY_DOMAIN) {
   console.error(
