@@ -27,7 +27,7 @@ const router     = express.Router();
 // ── Service imports ───────────────────────────────────────────────────────────
 // These were missing / commented out before — this is what caused the bug.
 const { generateInvoice }   = require('../services/pdf');    // Puppeteer + Handlebars
-const { sendInvoiceEmail }  = require('../services/email');  // Nodemailer
+const { sendInvoice }  = require('../services/email');  // Nodemailer
 
 // ─── ENV VARIABLES ────────────────────────────────────────────────────────────
 const SHOPIFY_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
@@ -323,14 +323,11 @@ async function handleSubmitOrder(req, res) {
     // ── Step 4b: Send confirmation email ─────────────────────────────────────
     // FIX: this was a comment block before — now actually called
     try {
-      await sendInvoiceEmail({
-        to:         formData.submitter_email,
-        pdfBuffer,                             // null if PDF failed — email.js skips attachment
-        draftOrder,
-        formData,
+      await sendInvoice({
         formType,
-        totals:     pdfTotals,
-        shipping,
+        formData,
+        draftOrder,
+        pdfBuffer,
       });
       console.log(`[submit-order] ✅ Email sent to ${formData.submitter_email}`);
     } catch (emailErr) {
