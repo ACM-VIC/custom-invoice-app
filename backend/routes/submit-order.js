@@ -26,8 +26,8 @@ const router     = express.Router();
 
 // ── Service imports ───────────────────────────────────────────────────────────
 // These were missing / commented out before — this is what caused the bug.
-const { generateInvoice }   = require('./services/pdf');    // Puppeteer + Handlebars
-const { sendInvoiceEmail }  = require('./services/email');  // Nodemailer
+const { generateInvoice }   = require('../services/pdf');    // Puppeteer + Handlebars
+const { sendInvoiceEmail }  = require('../services/email');  // Nodemailer
 
 // ─── ENV VARIABLES ────────────────────────────────────────────────────────────
 const SHOPIFY_DOMAIN  = process.env.SHOPIFY_STORE_DOMAIN;
