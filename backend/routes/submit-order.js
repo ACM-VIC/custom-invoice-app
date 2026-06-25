@@ -1,360 +1,566 @@
 /**
- * routes/submit-order.js  —  Backend handler for NDIS / Aged Care order submissions
+ * Email Service
+ * Sends invoice emails via Microsoft Outlook / Office 365 SMTP.
  *
- * What this module does:
- *  1. Receives the form payload (formData, cart) from the frontend
- *  2. Extracts shipping details from formData fields set by the shipping module
- *  3. Creates a Shopify Draft Order with line_items, shipping_address, shipping_line
- *  4. Generates a PDF invoice via services/pdf.js  (was commented out — now wired in)
- *  5. Sends the confirmation email via services/email.js (was commented out — now wired in)
- *
- * ─── ENVIRONMENT VARIABLES REQUIRED ─────────────────────────────────────────
- *  SHOPIFY_STORE_DOMAIN   e.g. your-store.myshopify.com   ← must NOT include https://
- *  SHOPIFY_ADMIN_TOKEN    Admin API access token (write_draft_orders scope)
- *  SHOPIFY_API_VERSION    e.g. 2024-01  (falls back to '2024-01' if missing)
- *
- *  SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER / SMTP_PASS
- *  EMAIL_FROM / EMAIL_ORDERS_CC
- *  (see services/email.js for full list)
- * ─────────────────────────────────────────────────────────────────────────────
+ * Exports:
+ *   sendInvoice()              — Normal path: customer invoice + PDF attachment
+ *   sendQuoteRequest()         — Quote path:  internal team email with full order details
+ *   sendQuoteAcknowledgement() — Quote path:  customer acknowledgement (no PDF)
  */
 
-'use strict';
+/**
+ * =========================================
+ * EMAIL SERVICE (SMTP + ATTACHMENTS)
+ * =========================================
+ *
+ * PURPOSE:
+ * Sends invoice emails with PDF attachments to:
+ * - Customer (normal path)
+ * - Plan Manager / Provider (NDIS / Aged Care, normal path)
+ * - Internal team (quote/bulky path only)
+ *
+ * -----------------------------------------
+ * WHAT YOU EDIT HERE
+ * -----------------------------------------
+ * SMTP SETTINGS:
+ * - email credentials (env vars)
+ * - Outlook / Office365 config
+ *
+ * EMAIL CONTENT:
+ * - subject lines
+ * - HTML email templates
+ * - recipient logic per flow
+ *
+ * -----------------------------------------
+ * DO NOT TOUCH
+ * -----------------------------------------
+ * - attachment handling (PDF buffer logic)
+ * - transporter creation
+ */
 
-const express    = require('express');
-const router     = express.Router();
+const nodemailer = require('nodemailer');
 
-// ── Service imports ───────────────────────────────────────────────────────────
-// These were missing / commented out before — this is what caused the bug.
-const { generateInvoice }   = require('../services/pdf');    // Puppeteer + Handlebars
-const { sendInvoice }  = require('../services/email');  // Nodemailer
+// ── Transporter (Outlook / Office 365 SMTP) ──────────────────────────────────
+function createTransporter() {
+  const user = process.env.OUTLOOK_EMAIL;
+  const pass = process.env.OUTLOOK_APP_PASSWORD;
 
-// ─── ENV VARIABLES ────────────────────────────────────────────────────────────
-const SHOPIFY_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
-const SHOPIFY_TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN;
-const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
-// ─── STARTUP GUARD ────────────────────────────────────────────────────────────
-if (!SHOPIFY_DOMAIN) {
-  console.error(
-    '[submit-order] ⚠️  SHOPIFY_STORE_DOMAIN is not set. ' +
-    'Set it in Azure Portal → App Service → Configuration → Application Settings.'
-  );
-}
-if (!SHOPIFY_TOKEN) {
-  console.error(
-    '[submit-order] ⚠️  SHOPIFY_ADMIN_TOKEN is not set. ' +
-    'Set it in Azure Portal → App Service → Configuration.'
-  );
+  if (!user || !pass) {
+    throw new Error('Missing OUTLOOK_EMAIL or OUTLOOK_APP_PASSWORD environment variables.');
+  }
+
+  return nodemailer.createTransport({
+    host:   'smtp.office365.com',
+    port:   587,
+    secure: false, // STARTTLS
+    auth:   { user, pass },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHIPPING HELPERS
+// SHARED HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function extractShippingLine(formData) {
-  const rawPrice    = formData.shipping_price;
-  const isQuote     = rawPrice === 'quote';
-  const priceNumber = (!rawPrice || isQuote) ? null : parseFloat(rawPrice);
-
+function storeMeta() {
   return {
-    title:         formData.shipping_title         || 'Delivery',
-    price:         isQuote ? 'quote' : priceNumber,
-    priceDisplay:  formData.shipping_price_display  || (isQuote ? 'Manual Quote' : 'TBC'),
-    category:      formData.shipping_category       || '',
-    categoryLabel: formData.shipping_category_label || '',
-    zone:          formData.shipping_zone           || '',
-    zoneLabel:     formData.shipping_zone_label     || '',
-    isQuote,
-    overrideNotes: formData.shipping_override_notes || '',
+    name:    process.env.STORE_NAME    || 'Aged Care & Medical',
+    email:   process.env.STORE_EMAIL   || 'accounts@agedcareandmedical.com.au',
+    abn:     process.env.STORE_ABN     || '54 164 689 294',
+    phone:   process.env.STORE_PHONE   || '1300 003 930',
+    from:    process.env.OUTLOOK_EMAIL,
   };
 }
 
-// ─── SHOPIFY HELPERS ──────────────────────────────────────────────────────────
-
-function buildShopifyShippingLine(shipping) {
-  if (!shipping || shipping.price === null) return null;
-  const priceValue = (shipping.isQuote || shipping.price === 'quote')
-    ? '0.00'
-    : Number(shipping.price).toFixed(2);
-  return { title: shipping.title || 'Delivery', price: priceValue, custom: true };
+function formatFundingType(raw) {
+  return (raw || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function buildLineItems(cartItems) {
-  if (!cartItems?.length) return [];
-  return cartItems.map(item => ({
-    variant_id: item.variant_id,
-    quantity:   item.quantity,
-    price:      (item.price / 100).toFixed(2),
-    title:      item.product_title || item.title,
-  }));
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. NORMAL PATH — Customer invoice email (with PDF)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildInvoiceEmailHtml({ formType, formData, draftOrder }) {
+  const store       = storeMeta();
+  const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 15px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
+        .wrap { max-width: 560px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+        .header { background: #DC4E00; color: #fff; padding: 28px 32px; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p  { margin: 6px 0 0; font-size: 14px; opacity: .75; }
+        .body { padding: 28px 32px; }
+        .body p { line-height: 1.6; margin: 0 0 14px; }
+        .highlight { background: #f9f9f9; border-left: 3px solid #DC4E00; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 14px; }
+        .highlight strong { display: block; margin-bottom: 4px; font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: .5px; }
+        .footer { background: #f5f5f5; padding: 18px 32px; font-size: 12px; color: #888; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="header">
+          <h1>Tax Invoice — ${draftOrder.name}</h1>
+          <p>${billingType} Invoice Request from ${store.name}</p>
+        </div>
+        <div class="body">
+          <p>Dear ${formData.submitter_full_name || formData.first_name},</p>
+          <p>Thank you for your order. Please find your <strong>${billingType} tax invoice</strong> attached to this email.</p>
+          <p>Your order has been placed on hold as a draft. Once we receive confirmation of payment, we will process and fulfil your order.</p>
+
+          <div class="highlight">
+            <strong>Order reference</strong>
+            ${draftOrder.name}
+          </div>
+
+          <div class="highlight">
+            <strong>Total amount due</strong>
+            $${parseFloat(draftOrder.total_price || 0).toFixed(2)} AUD (GST included)
+          </div>
+
+          ${formType === 'ndis' ? `
+          <div class="highlight">
+            <strong>NDIS number</strong>
+            ${formData.ndis_number || '—'}
+          </div>
+          ` : `
+          <div class="highlight">
+            <strong>Funding Type</strong>
+            ${formatFundingType(formData.ac_funding_type)}
+          </div>
+          `}
+
+          <p>Please review the attached PDF invoice and forward it to your ${formType === 'ndis' ? 'plan manager or support coordinator' : 'aged care coordinator'} for payment processing.</p>
+          <p>If you have any questions, please don't hesitate to contact us at <a href="mailto:${store.email}">${store.email}</a>.</p>
+          <p>Kind regards,<br><strong>${store.name} Team</strong></p>
+        </div>
+        <div class="footer">
+          This is an automated email. Please do not reply directly to this message.<br>
+          ABN: ${store.abn}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }
 
-function buildShippingAddress(formData) {
-  const fullName  = formData.participant_full_name || '';
-  const nameParts = fullName.trim().split(' ');
-  return {
-    first_name: nameParts[0] || '',
-    last_name:  nameParts.slice(1).join(' ') || '',
-    address1:   formData.address_line1 || '',
-    city:       formData.suburb        || '',
-    province:   formData.state         || '',
-    zip:        formData.postcode      || '',
-    country:    'AU',
-    phone:      formData.delivery_phone || formData.submitter_phone || '',
-  };
-}
+/**
+ * sendInvoice — Normal path only.
+ * Sends the PDF invoice to customer, plan manager, or provider depending on form type.
+ */
+async function sendInvoice({ formType, formData, draftOrder, pdfBuffer }) {
+  const transporter = createTransporter();
+  const store       = storeMeta();
+  const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
 
-function buildNoteAttributes(formType, formData, shipping) {
-  const priceNote = shipping.isQuote
-    ? 'Manual Quote Required'
-    : (shipping.price !== null ? `$${Number(shipping.price).toFixed(2)}` : 'TBC');
+  const toAddresses = [
+    formData.submitter_email,
+    formData.participant_email,
+    formType === 'ndis' && formData.ndis_funding_type === 'plan_managed'
+      ? formData.plan_manager_email : null,
+    formType === 'aged_care' && formData.ac_funding_type === 'home_care_package'
+      ? formData.hcp_accounts_email : null,
+    formType === 'aged_care' && formData.ac_funding_type === 'other_state_program'
+      ? formData.other_auth_email : null,
+  ]
+    .filter(Boolean)
+    .map(e => e.trim().toLowerCase())
+    .filter((e, i, arr) => arr.indexOf(e) === i);
 
-  const attrs = [
-    { name: 'Form Type',         value: formType === 'ndis' ? 'NDIS' : 'Aged Care / Government' },
-    { name: 'Submitter Name',    value: formData.submitter_full_name  || '' },
-    { name: 'Submitter Email',   value: formData.submitter_email      || '' },
-    { name: 'Submitter Phone',   value: formData.submitter_phone      || '' },
-    { name: 'Participant Name',  value: formData.participant_full_name || '' },
-    { name: 'Delivery Suburb',   value: formData.suburb               || '' },
-    { name: 'Delivery State',    value: formData.state                || '' },
-    { name: 'Delivery Postcode', value: formData.postcode             || '' },
-    { name: 'Shipping Category', value: shipping.categoryLabel        || '' },
-    { name: 'Delivery Zone',     value: shipping.zoneLabel            || '' },
-    { name: 'Shipping Method',   value: shipping.title                || '' },
-    { name: 'Shipping Fee',      value: priceNote                        },
-  ];
-
-  if (shipping.overrideNotes) {
-    attrs.push({ name: 'Freight Notes', value: shipping.overrideNotes });
-  }
-
-  if (formType === 'ndis') {
-    attrs.push(
-      { name: 'Funding Type',   value: formData.ndis_funding_type   || '' },
-      { name: 'NDIS Number',    value: formData.ndis_number         || '' },
-      { name: 'Submitter Role', value: formData.ndis_submitter_role || '' },
-    );
-    if (formData.ndis_funding_type === 'plan_managed') {
-      attrs.push(
-        { name: 'Plan Manager',   value: formData.plan_manager_company || '' },
-        { name: 'Plan Mgr Email', value: formData.plan_manager_email   || '' },
-      );
-    }
-  }
-
-  if (formType === 'aged_care') {
-    attrs.push(
-      { name: 'Funding Program',  value: formData.ac_funding_type   || '' },
-      { name: 'Submitter Role',   value: formData.ac_submitter_role || '' },
-      { name: 'Client Reference', value: formData.client_reference  || '' },
-    );
-  }
-
-  if (formData.notes) {
-    attrs.push({ name: 'Notes', value: formData.notes });
-  }
-
-  return attrs.filter(a => a.value && a.value.trim() !== '');
-}
-
-async function createShopifyDraftOrder({ formType, formData, cart, shipping }) {
-  if (!SHOPIFY_DOMAIN || !SHOPIFY_TOKEN) {
-    throw new Error(
-      'Shopify env vars not configured — set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.'
-    );
-  }
-
-  const lineItems       = buildLineItems(cart.items);
-  const shippingAddress = buildShippingAddress(formData);
-  const noteAttributes  = buildNoteAttributes(formType, formData, shipping);
-  const shopifyShipping = buildShopifyShippingLine(shipping);
-
-  const draftOrderPayload = {
-    draft_order: {
-      line_items:       lineItems,
-      shipping_address: shippingAddress,
-      billing_address:  shippingAddress,
-      note_attributes:  noteAttributes,
-      note:             formData.notes || '',
-      email:            formData.submitter_email || '',
-      phone:            formData.submitter_phone || '',
-      tags: [
-        formType === 'ndis' ? 'NDIS' : 'Aged Care',
-        formData.ndis_funding_type || formData.ac_funding_type || '',
-        'Modal Order',
-        shipping.isQuote ? 'Freight Quote Needed' : '',
-      ].filter(Boolean).join(', '),
-      ...(shopifyShipping && { shipping_line: shopifyShipping }),
-    },
+  const mailOptions = {
+    from:    `"${store.name}" <${store.from}>`,
+    to:      toAddresses.join(', '),
+    subject: `${billingType} Tax Invoice ${draftOrder.name} — ${store.name}`,
+    html:    buildInvoiceEmailHtml({ formType, formData, draftOrder }),
+    attachments: pdfBuffer
+      ? [{
+          filename:    `Invoice-${draftOrder.name}.pdf`,
+          content:     pdfBuffer,
+          contentType: 'application/pdf',
+        }]
+      : [],
   };
 
-  const url = `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_VERSION}/draft_orders.json`;
-  console.log(`[submit-order] Creating Shopify draft order → ${url}`);
+  if (process.env.INTERNAL_BCC_EMAIL) {
+    mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
+  }
 
-  const res = await fetch(url, {
-    method:  'POST',
-    headers: {
-      'Content-Type':           'application/json',
-      'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-    },
-    body: JSON.stringify(draftOrderPayload),
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[email] Invoice sent: ${info.messageId} → ${toAddresses.join(', ')}`);
+  return info;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. QUOTE PATH — Internal team email
+//    Sent to INTERNAL_QUOTE_EMAIL so the team can quote and create the draft
+//    order manually.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
+  const store       = storeMeta();
+  const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
+  const submittedAt = new Date().toLocaleString('en-AU', {
+    timeZone: 'Australia/Melbourne',
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   });
 
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`Shopify API error (${res.status}): ${errBody}`);
+  // Build cart rows HTML
+  const cartRowsHtml = (cart.items || []).map(item => `
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;">${item.product_title || item.title}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;">$${(item.price / 100).toFixed(2)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;">$${((item.price * item.quantity) / 100).toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const cartSubtotal = ((cart.total_price || 0) / 100).toFixed(2);
+
+  // Funding-specific detail rows
+  let fundingDetail = '';
+  if (formType === 'ndis') {
+    fundingDetail = `
+      <tr><td style="padding:5px 10px;color:#555;width:180px;">Funding Type</td><td style="padding:5px 10px;">${formatFundingType(formData.ndis_funding_type)}</td></tr>
+      <tr><td style="padding:5px 10px;color:#555;">NDIS Number</td><td style="padding:5px 10px;">${formData.ndis_number || '—'}</td></tr>
+      <tr><td style="padding:5px 10px;color:#555;">Submitter Role</td><td style="padding:5px 10px;">${formatFundingType(formData.ndis_submitter_role)}</td></tr>
+      ${formData.ndis_funding_type === 'plan_managed' ? `
+      <tr><td style="padding:5px 10px;color:#555;">Plan Manager</td><td style="padding:5px 10px;">${formData.plan_manager_company || '—'}</td></tr>
+      <tr><td style="padding:5px 10px;color:#555;">Plan Mgr Email</td><td style="padding:5px 10px;">${formData.plan_manager_email || '—'}</td></tr>
+      ` : ''}
+    `;
+  } else {
+    fundingDetail = `
+      <tr><td style="padding:5px 10px;color:#555;width:180px;">Funding Program</td><td style="padding:5px 10px;">${formatFundingType(formData.ac_funding_type)}</td></tr>
+      <tr><td style="padding:5px 10px;color:#555;">Submitter Role</td><td style="padding:5px 10px;">${formatFundingType(formData.ac_submitter_role)}</td></tr>
+      <tr><td style="padding:5px 10px;color:#555;">Client Reference</td><td style="padding:5px 10px;">${formData.client_reference || '—'}</td></tr>
+      ${formData.ac_funding_type === 'home_care_package' ? `
+      <tr><td style="padding:5px 10px;color:#555;">HCP Provider</td><td style="padding:5px 10px;">${formData.hcp_provider_name || '—'}</td></tr>
+      <tr><td style="padding:5px 10px;color:#555;">HCP Accts Email</td><td style="padding:5px 10px;">${formData.hcp_accounts_email || '—'}</td></tr>
+      ` : ''}
+    `;
   }
 
-  const json = await res.json();
-  return json.draft_order;
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 14px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
+        .wrap { max-width: 640px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+        .header { background: #1a1a1a; color: #fff; padding: 22px 28px; }
+        .header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+        .header p  { margin: 5px 0 0; font-size: 13px; opacity: .7; }
+        .alert-banner { background: #E65100; color: #fff; padding: 12px 28px; font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+        .section { padding: 20px 28px 0; }
+        .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #DC4E00; border-bottom: 2px solid #f2e0d8; padding-bottom: 6px; margin-bottom: 12px; }
+        table.detail { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+        table.detail td { font-size: 13px; vertical-align: top; }
+        table.cart { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+        table.cart th { background: #f5f5f5; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #555; text-align: left; }
+        table.cart th:nth-child(2), table.cart th:nth-child(3), table.cart th:nth-child(4) { text-align: center; }
+        table.cart th:last-child { text-align: right; }
+        .totals-row { display: flex; justify-content: flex-end; padding: 12px 28px; border-top: 2px solid #eee; }
+        .totals-box { font-size: 13px; }
+        .totals-box .line { display: flex; justify-content: space-between; gap: 48px; padding: 3px 0; color: #555; }
+        .totals-box .line.total { font-weight: 700; font-size: 15px; color: #222; border-top: 1px solid #ddd; margin-top: 6px; padding-top: 8px; }
+        .shipping-box { margin: 16px 28px; background: #fff8e1; border: 1.5px solid #ffb74d; border-radius: 6px; padding: 14px 16px; font-size: 13px; }
+        .shipping-box strong { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: #e65100; margin-bottom: 6px; }
+        .shipping-box .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+        .shipping-box .pill { background: rgba(230,81,0,.1); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: #bf360c; font-weight: 600; }
+        .notes-box { margin: 0 28px 20px; background: #f9f9f9; border-left: 3px solid #ccc; border-radius: 4px; padding: 10px 14px; font-size: 13px; color: #555; }
+        .action-banner { background: #DC4E00; color: #fff; padding: 16px 28px; font-size: 14px; line-height: 1.6; }
+        .action-banner strong { display: block; font-size: 16px; margin-bottom: 6px; }
+        .footer { background: #f5f5f5; padding: 14px 28px; font-size: 11px; color: #999; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+
+        <div class="header">
+          <h1>🚛 Freight Quote Request — Action Required</h1>
+          <p>${store.name} · ${billingType} Order · Submitted ${submittedAt} (AEST)</p>
+        </div>
+
+        <div class="alert-banner">
+          ⚠️ This order contains BULKY / FREIGHT items and requires a manual shipping quote before processing.
+          Do NOT create a Shopify draft order until the freight cost has been confirmed with the customer.
+        </div>
+
+        <!-- CUSTOMER DETAILS -->
+        <div class="section">
+          <div class="section-title">Customer / Submitter</div>
+          <table class="detail">
+            <tr><td style="padding:5px 10px;color:#555;width:180px;">Name</td><td style="padding:5px 10px;">${formData.submitter_full_name || '—'}</td></tr>
+            <tr><td style="padding:5px 10px;color:#555;">Email</td><td style="padding:5px 10px;">${formData.submitter_email || '—'}</td></tr>
+            <tr><td style="padding:5px 10px;color:#555;">Phone</td><td style="padding:5px 10px;">${formData.submitter_phone || '—'}</td></tr>
+          </table>
+        </div>
+
+        <!-- PARTICIPANT / DELIVERY -->
+        <div class="section">
+          <div class="section-title">Participant / Delivery Details</div>
+          <table class="detail">
+            <tr><td style="padding:5px 10px;color:#555;width:180px;">Participant Name</td><td style="padding:5px 10px;">${formData.participant_full_name || '—'}</td></tr>
+            <tr><td style="padding:5px 10px;color:#555;">Delivery Address</td><td style="padding:5px 10px;">${formData.address_line1 || '—'}</td></tr>
+            <tr><td style="padding:5px 10px;color:#555;">Suburb / State / PC</td><td style="padding:5px 10px;">${formData.suburb || ''} ${formData.state || ''} ${formData.postcode || ''}</td></tr>
+            <tr><td style="padding:5px 10px;color:#555;">Delivery Phone</td><td style="padding:5px 10px;">${formData.delivery_phone || formData.submitter_phone || '—'}</td></tr>
+          </table>
+        </div>
+
+        <!-- FUNDING -->
+        <div class="section">
+          <div class="section-title">${billingType} Funding Details</div>
+          <table class="detail">
+            ${fundingDetail}
+          </table>
+        </div>
+
+        <!-- SHIPPING DETAILS -->
+        <div class="shipping-box">
+          <strong>🚛 Shipping / Freight Details</strong>
+          <div class="row">
+            <span class="pill">Category: ${shipping.categoryLabel || '—'}</span>
+            <span class="pill">Zone: ${shipping.zoneLabel || '—'}</span>
+            <span class="pill">Postcode: ${formData.postcode || '—'}</span>
+            ${shipping.drivingItem ? `<span class="pill">Driver: ${shipping.drivingItem}</span>` : ''}
+          </div>
+          ${shipping.upgradeSummary ? `
+          <div style="margin-top:8px;font-size:12px;color:#5d4037;">
+            ⬆️ <strong>Quantity upgrade:</strong> ${shipping.upgradeSummary}
+          </div>
+          ` : ''}
+          ${shipping.overrideNotes ? `
+          <div style="margin-top:8px;font-size:12px;color:#4a148c;">
+            📋 <strong>Freight notes from customer:</strong> ${shipping.overrideNotes}
+          </div>
+          ` : ''}
+        </div>
+
+        <!-- CART ITEMS -->
+        <div class="section">
+          <div class="section-title">Cart Items</div>
+        </div>
+        <table class="cart">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th style="text-align:center;">Qty</th>
+              <th style="text-align:right;">Unit Price</th>
+              <th style="text-align:right;">Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${cartRowsHtml || '<tr><td colspan="4" style="padding:12px;color:#888;text-align:center;">No items</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="totals-row">
+          <div class="totals-box">
+            <div class="line"><span>Subtotal (excl. freight)</span><span>$${cartSubtotal}</span></div>
+            <div class="line"><span>Freight</span><span style="color:#e65100;">Manual Quote TBC</span></div>
+            <div class="line total"><span>Total (excl. freight)</span><span>$${cartSubtotal}</span></div>
+          </div>
+        </div>
+
+        ${formData.notes ? `
+        <div style="padding:0 28px;">
+          <div class="section-title" style="margin-top:16px;">Customer Notes</div>
+          <div class="notes-box">${formData.notes}</div>
+        </div>
+        ` : ''}
+
+        <div class="action-banner">
+          <strong>✅ Next Steps for the Team:</strong>
+          1. Contact the customer at <strong>${formData.submitter_email}</strong> / <strong>${formData.submitter_phone || '—'}</strong> with a freight quote.<br>
+          2. Once confirmed, create the Shopify Draft Order manually with the agreed shipping cost.<br>
+          3. Send the invoice to the customer / plan manager as appropriate.
+        </div>
+
+        <div class="footer">
+          Internal use only — ${store.name} · ABN ${store.abn} · ${store.email}
+        </div>
+
+      </div>
+    </body>
+    </html>
+  `;
 }
 
-// ─── PDF HELPERS ──────────────────────────────────────────────────────────────
+/**
+ * sendQuoteRequest — Quote path only.
+ * Emails the internal team with everything they need to manually quote + process.
+ */
+async function sendQuoteRequest({ formType, formData, cart, shipping }) {
+  const internalEmail = process.env.INTERNAL_QUOTE_EMAIL;
+  if (!internalEmail) {
+    throw new Error('INTERNAL_QUOTE_EMAIL env var is not set — cannot send quote request.');
+  }
 
-function buildPdfShippingRow(shipping) {
-  if (!shipping || (shipping.price === null && !shipping.isQuote)) {
-    return {
-      sku: '', description: 'Delivery — to be arranged', qty: 1,
-      unit_price: null, total: null, is_shipping: true,
-      note: 'Please contact us for a delivery quote.',
-    };
-  }
-  if (shipping.isQuote) {
-    return {
-      sku: '',
-      description: `${shipping.title} — ${shipping.categoryLabel} (${shipping.zoneLabel})`,
-      qty: 1, unit_price: null, total: null, display: 'Manual Quote', is_shipping: true,
-      note: shipping.overrideNotes
-        ? `Freight notes: ${shipping.overrideNotes}`
-        : 'Freight cost to be confirmed. Our team will contact you.',
-    };
-  }
-  const price = Number(shipping.price);
-  return {
-    sku: '', description: `${shipping.title}`, qty: 1,
-    unit_price: price, total: price,
-    display: shipping.priceDisplay || `$${price.toFixed(2)}`,
-    is_shipping: true,
-    note: `${shipping.categoryLabel} · ${shipping.zoneLabel}`,
+  const transporter = createTransporter();
+  const store       = storeMeta();
+  const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
+  const customerName = formData.submitter_full_name || formData.participant_full_name || 'Customer';
+
+  const mailOptions = {
+    from:    `"${store.name} Orders" <${store.from}>`,
+    to:      internalEmail,
+    subject: `🚛 FREIGHT QUOTE NEEDED — ${billingType} Order from ${customerName} (${formData.postcode || 'no postcode'})`,
+    html:    buildQuoteRequestHtml({ formType, formData, cart, shipping }),
   };
-}
 
-function buildPdfTotals(cart, shipping) {
-  const subtotalCents  = cart.total_price || 0;
-  const subtotalDollar = subtotalCents / 100;
-  const shippingDollar = (shipping && !shipping.isQuote && shipping.price !== null)
-    ? Number(shipping.price) : 0;
-  const grandTotal = subtotalDollar + shippingDollar;
-
-  let shippingDisplay;
-  if (!shipping || shipping.price === null)  shippingDisplay = 'TBC';
-  else if (shipping.isQuote)                 shippingDisplay = 'Manual Quote — To Be Confirmed';
-  else                                       shippingDisplay = shipping.priceDisplay || `$${shippingDollar.toFixed(2)}`;
-
-  return {
-    subtotal_cents:      subtotalCents,
-    subtotal_display:    `$${subtotalDollar.toFixed(2)}`,
-    shipping_price:      shippingDollar,
-    shipping_display:    shippingDisplay,
-    shipping_title:      shipping?.title        || 'Delivery',
-    shipping_category:   shipping?.categoryLabel || '',
-    shipping_zone:       shipping?.zoneLabel     || '',
-    grand_total_cents:   Math.round(grandTotal * 100),
-    grand_total_display: shipping?.isQuote
-      ? `$${subtotalDollar.toFixed(2)} + freight TBC`
-      : `$${grandTotal.toFixed(2)}`,
-  };
-}
-
-
-// ─── MAIN ROUTE HANDLER ───────────────────────────────────────────────────────
-
-async function handleSubmitOrder(req, res) {
-  try {
-    const { formType, formData, cart } = req.body;
-
-    if (!formType || !formData) {
-      return res.status(400).json({ success: false, message: 'Missing formType or formData.' });
-    }
-
-    // ── Step 1: Extract shipping ──────────────────────────────────────────────
-    const shipping = extractShippingLine(formData);
-    console.log('[submit-order] Shipping extracted:', {
-      category: shipping.categoryLabel, zone: shipping.zoneLabel,
-      price: shipping.priceDisplay, isQuote: shipping.isQuote, title: shipping.title,
-    });
-
-    // ── Step 2: Create Shopify Draft Order ────────────────────────────────────
-    let draftOrder = null;
-    try {
-      draftOrder = await createShopifyDraftOrder({
-        formType,
-        formData,
-        cart: cart || { items: [], total_price: 0 },
-        shipping,
-      });
-      console.log(`[submit-order] Shopify draft order created: ${draftOrder.name} (${draftOrder.id})`);
-    } catch (shopifyErr) {
-      // Log clearly — order creation failed but we still attempt PDF + email
-      console.error('[submit-order] ❌ Shopify draft order FAILED:', shopifyErr.message);
-      // draftOrder stays null; PDF + email will proceed without an order ref
-    }
-
-    // ── Step 3: Build PDF data ────────────────────────────────────────────────
-    const safeCart       = cart || { items: [], total_price: 0 };
-    const pdfShippingRow = buildPdfShippingRow(shipping);
-    const pdfTotals      = buildPdfTotals(safeCart, shipping);
-
-    // ── Step 4a: Generate PDF ─────────────────────────────────────────────────
-    // FIX: this was a comment block before — now actually called
-    let pdfBuffer = null;
-    try {
-      pdfBuffer = await generateInvoice({
-        formType,
-        formData,
-        draftOrder,   // may be null if Shopify failed — pdf.js handles gracefully
-      });
-      console.log(`[submit-order] ✅ PDF generated (${pdfBuffer.length} bytes)`);
-    } catch (pdfErr) {
-      console.error('[submit-order] ❌ PDF generation FAILED:', pdfErr.message);
-      // Continue — customer still gets an email, just without the PDF attachment
-    }
-
-    // ── Step 4b: Send confirmation email ─────────────────────────────────────
-    // FIX: this was a comment block before — now actually called
-    try {
-      await sendInvoice({
-        formType,
-        formData,
-        draftOrder,
-        pdfBuffer,
-      });
-      console.log(`[submit-order] ✅ Email sent to ${formData.submitter_email}`);
-    } catch (emailErr) {
-      console.error('[submit-order] ❌ Email send FAILED:', emailErr.message);
-      // Don't fail the whole request just because email failed
-    }
-
-    // ── Step 5: Respond ───────────────────────────────────────────────────────
-    return res.json({
-      success:          true,
-      draft_order_id:   draftOrder?.id   || null,
-      draft_order_name: draftOrder?.name || null,
-      shipping_applied: {
-        category: shipping.categoryLabel,
-        zone:     shipping.zoneLabel,
-        title:    shipping.title,
-        price:    shipping.isQuote ? 'quote' : shipping.price,
-        display:  shipping.priceDisplay,
-      },
-    });
-
-  } catch (err) {
-    console.error('[submit-order] Unhandled error:', err);
-    return res.status(500).json({ success: false, message: 'Internal server error.' });
+  // BCC internal orders address if configured separately
+  if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalEmail) {
+    mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
   }
+
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[email] Quote request sent: ${info.messageId} → ${internalEmail}`);
+  return info;
 }
 
-// ─── ROUTER ───────────────────────────────────────────────────────────────────
-router.post('/submit-order', handleSubmitOrder);
-module.exports = router;
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. QUOTE PATH — Customer acknowledgement email (no PDF, no draft order ref)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildAcknowledgementHtml({ formType, formData, shipping }) {
+  const store       = storeMeta();
+  const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 15px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
+        .wrap { max-width: 560px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+        .header { background: #DC4E00; color: #fff; padding: 28px 32px; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p  { margin: 6px 0 0; font-size: 14px; opacity: .75; }
+        .body { padding: 28px 32px; }
+        .body p { line-height: 1.6; margin: 0 0 14px; }
+        .steps { background: #f9f9f9; border-radius: 6px; padding: 16px 20px; margin: 20px 0; }
+        .steps h3 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: #555; }
+        .step { display: flex; gap: 12px; margin-bottom: 10px; font-size: 14px; }
+        .step-num { background: #DC4E00; color: #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+        .highlight { background: #f9f9f9; border-left: 3px solid #DC4E00; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 14px; }
+        .highlight strong { display: block; margin-bottom: 4px; font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: .5px; }
+        .contact-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 6px; }
+        .contact-row a { color: #DC4E00; text-decoration: none; font-weight: 600; }
+        .footer { background: #f5f5f5; padding: 18px 32px; font-size: 12px; color: #888; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="header">
+          <h1>We've Received Your Order Request</h1>
+          <p>${billingType} · ${store.name}</p>
+        </div>
+        <div class="body">
+          <p>Dear ${formData.submitter_full_name || 'Customer'},</p>
+
+          <p>
+            Thank you for submitting your ${billingType} order request. 
+            Because your order includes <strong>bulky or freight items</strong>, 
+            we need to arrange a custom delivery quote for your area before we can finalise and process your order.
+          </p>
+
+          <div class="highlight">
+            <strong>Delivery Location</strong>
+            ${formData.suburb || ''} ${formData.state || ''} ${formData.postcode || ''}
+          </div>
+
+          <div class="highlight">
+            <strong>Shipping Category</strong>
+            ${shipping.categoryLabel || 'Bulky / Freight'}
+            ${shipping.zoneLabel ? ` — ${shipping.zoneLabel}` : ''}
+          </div>
+
+          ${shipping.upgradeSummary ? `
+          <div class="highlight">
+            <strong>Why is this freight?</strong>
+            ${shipping.upgradeSummary}. The combined quantity of your items requires freight delivery.
+          </div>
+          ` : ''}
+
+          <div class="steps">
+            <h3>What happens next</h3>
+            <div class="step">
+              <div class="step-num">1</div>
+              <div>Our team will review your order and calculate the freight cost for your location.</div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div>We'll contact you at <strong>${formData.submitter_email}</strong> or <strong>${formData.submitter_phone || '—'}</strong> with the freight quote.</div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div>Once you approve the quote, we'll finalise the order and send your invoice for payment.</div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div>After payment is received, your order will be dispatched.</div>
+            </div>
+          </div>
+
+          <p>
+            If you have any questions in the meantime, please don't hesitate to get in touch:
+          </p>
+          <div class="contact-row">
+            <a href="mailto:${store.email}">✉️ ${store.email}</a>
+            <a href="tel:${store.phone}">📞 ${store.phone}</a>
+          </div>
+
+          <p style="margin-top:20px;">Kind regards,<br><strong>${store.name} Team</strong></p>
+        </div>
+        <div class="footer">
+          This is an automated email. Please do not reply directly to this message.<br>
+          ABN: ${store.abn}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * sendQuoteAcknowledgement — Quote path only.
+ * Tells the customer their request was received and the team will be in touch with a freight quote.
+ */
+async function sendQuoteAcknowledgement({ formType, formData, shipping }) {
+  const customerEmail = formData.submitter_email;
+  if (!customerEmail) {
+    throw new Error('Cannot send acknowledgement — submitter_email is missing from formData.');
+  }
+
+  const transporter = createTransporter();
+  const store       = storeMeta();
+  const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
+
+  const mailOptions = {
+    from:    `"${store.name}" <${store.from}>`,
+    to:      customerEmail,
+    subject: `Your ${billingType} Order Request — Freight Quote Pending · ${store.name}`,
+    html:    buildAcknowledgementHtml({ formType, formData, shipping }),
+  };
+
+  if (process.env.INTERNAL_BCC_EMAIL) {
+    mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
+  }
+
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[email] Acknowledgement sent: ${info.messageId} → ${customerEmail}`);
+  return info;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+module.exports = { sendInvoice, sendQuoteRequest, sendQuoteAcknowledgement };

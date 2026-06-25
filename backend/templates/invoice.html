@@ -516,14 +516,23 @@
         {{/if}}
 
         <div class="totals-row">
-          <span class="label">GST (10%)</span>
-          <span class="value">{{tax}}</span>
+          <span class="label">Subtotal (inc. GST)</span>
+          <span class="value">{{subtotal}}</span>
         </div>
+
+        {{#if shipping}}
+        <div class="totals-row">
+          <span class="label">{{shipping.title}}</span>
+          <span class="value">{{shipping.amount}}</span>
+        </div>
+        {{/if}}
+
         <hr class="totals-divider" />
         <div class="totals-row grand">
           <span class="label">Total Due</span>
           <span class="value">{{total}} AUD</span>
         </div>
+        <div class="gst-note">GST included: {{tax}}</div>
       </div>
     </div>
 
