@@ -1,20 +1,16 @@
 'use strict';
-
 const express    = require('express');
 const router     = express.Router();
-
 const { generateInvoice }                                          = require('../services/pdf');
 const { sendInvoice, sendQuoteRequest, sendQuoteAcknowledgement, sendInternalInvoiceNotification } = require('../services/email');
-
 // ─── ENV VARIABLES ────────────────────────────────────────────────────────────
-const SHOPIFY_SHOP_DOMAIN  = process.env.SHOPIFY_STORE_DOMAIN;
+const SHOPIFY_SHOP_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
 const SHOPIFY_ACCESS_TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
-
 // ─── STARTUP GUARD ────────────────────────────────────────────────────────────
 if (!SHOPIFY_SHOP_DOMAIN) {
   console.error(
-    '[submit-order] ⚠️  SHOPIFY_STORE_DOMAIN is not set. ' +
+    '[submit-order] ⚠️  SHOPIFY_SHOP_DOMAIN is not set. ' +
     'Set it in Azure Portal → App Service → Configuration → Application Settings.'
   );
 }
@@ -24,16 +20,13 @@ if (!SHOPIFY_ACCESS_TOKEN) {
     'Set it in Azure Portal → App Service → Configuration.'
   );
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SHIPPING HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-
 function extractShippingLine(formData) {
   const rawPrice    = formData.shipping_price;
   const isQuote     = rawPrice === 'quote';
   const priceNumber = (!rawPrice || isQuote) ? null : parseFloat(rawPrice);
-
   return {
     title:         formData.shipping_title         || 'Delivery',
     price:         isQuote ? 'quote' : priceNumber,
@@ -48,9 +41,7 @@ function extractShippingLine(formData) {
     drivingItem:     formData.shipping_driving_item     || '',
   };
 }
-
 // ─── SHOPIFY HELPERS ──────────────────────────────────────────────────────────
-
 function buildShopifyShippingLine(shipping) {
   if (!shipping || shipping.price === null) return null;
   const priceValue = (shipping.isQuote || shipping.price === 'quote')
@@ -58,7 +49,6 @@ function buildShopifyShippingLine(shipping) {
     : Number(shipping.price).toFixed(2);
   return { title: shipping.title || 'Delivery', price: priceValue, custom: true };
 }
-
 function buildLineItems(cartItems) {
   if (!cartItems?.length) return [];
   return cartItems.map(item => ({
@@ -68,7 +58,6 @@ function buildLineItems(cartItems) {
     title:      item.product_title || item.title,
   }));
 }
-
 function buildShippingAddress(formData) {
   const fullName  = formData.participant_full_name || '';
   const nameParts = fullName.trim().split(' ');
@@ -83,12 +72,10 @@ function buildShippingAddress(formData) {
     phone:      formData.delivery_phone || formData.submitter_phone || '',
   };
 }
-
 function buildNoteAttributes(formType, formData, shipping) {
   const priceNote = shipping.isQuote
     ? 'Manual Quote Required'
     : (shipping.price !== null ? `$${Number(shipping.price).toFixed(2)}` : 'TBC');
-
   const attrs = [
     { name: 'Form Type',         value: formType === 'ndis' ? 'NDIS' : 'Aged Care / Government' },
     { name: 'Submitter Name',    value: formData.submitter_full_name  || '' },
@@ -103,11 +90,9 @@ function buildNoteAttributes(formType, formData, shipping) {
     { name: 'Shipping Method',   value: shipping.title                || '' },
     { name: 'Shipping Fee',      value: priceNote                        },
   ];
-
   if (shipping.overrideNotes) {
     attrs.push({ name: 'Freight Notes', value: shipping.overrideNotes });
   }
-
   if (formType === 'ndis') {
     attrs.push(
       { name: 'Funding Type',   value: formData.ndis_funding_type   || '' },
@@ -121,7 +106,6 @@ function buildNoteAttributes(formType, formData, shipping) {
       );
     }
   }
-
   if (formType === 'aged_care') {
     attrs.push(
       { name: 'Funding Program',  value: formData.ac_funding_type   || '' },
@@ -129,26 +113,21 @@ function buildNoteAttributes(formType, formData, shipping) {
       { name: 'Client Reference', value: formData.client_reference  || '' },
     );
   }
-
   if (formData.notes) {
     attrs.push({ name: 'Notes', value: formData.notes });
   }
-
   return attrs.filter(a => a.value && a.value.trim() !== '');
 }
-
 async function createShopifyDraftOrder({ formType, formData, cart, shipping }) {
-  if (!SHOPIFY_DOMAIN || !SHOPIFY_TOKEN) {
+  if (!SHOPIFY_SHOP_DOMAIN || !SHOPIFY_ACCESS_TOKEN) {
     throw new Error(
-      'Shopify env vars not configured — set SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_TOKEN.'
+      'Shopify env vars not configured — set SHOPIFY_SHOP_DOMAIN and SHOPIFY_ACCESS_TOKEN.'
     );
   }
-
   const lineItems       = buildLineItems(cart.items);
   const shippingAddress = buildShippingAddress(formData);
   const noteAttributes  = buildNoteAttributes(formType, formData, shipping);
   const shopifyShipping = buildShopifyShippingLine(shipping);
-
   const draftOrderPayload = {
     draft_order: {
       line_items:       lineItems,
@@ -167,30 +146,24 @@ async function createShopifyDraftOrder({ formType, formData, cart, shipping }) {
       ...(shopifyShipping && { shipping_line: shopifyShipping }),
     },
   };
-
-  const url = `https://${SHOPIFY_DOMAIN}/admin/api/${SHOPIFY_VERSION}/draft_orders.json`;
+  const url = `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_VERSION}/draft_orders.json`;
   console.log(`[submit-order] Creating Shopify draft order → ${url}`);
-
   const res = await fetch(url, {
     method:  'POST',
     headers: {
       'Content-Type':           'application/json',
-      'X-Shopify-Access-Token': SHOPIFY_TOKEN,
+      'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN,
     },
     body: JSON.stringify(draftOrderPayload),
   });
-
   if (!res.ok) {
     const errBody = await res.text().catch(() => '');
     throw new Error(`Shopify API error (${res.status}): ${errBody}`);
   }
-
   const json = await res.json();
   return json.draft_order;
 }
-
 // ─── PDF HELPERS ──────────────────────────────────────────────────────────────
-
 function buildPdfShippingRow(shipping) {
   if (!shipping || (shipping.price === null && !shipping.isQuote)) {
     return {
@@ -218,19 +191,16 @@ function buildPdfShippingRow(shipping) {
     note: `${shipping.categoryLabel} · ${shipping.zoneLabel}`,
   };
 }
-
 function buildPdfTotals(cart, shipping) {
   const subtotalCents  = cart.total_price || 0;
   const subtotalDollar = subtotalCents / 100;
   const shippingDollar = (shipping && !shipping.isQuote && shipping.price !== null)
     ? Number(shipping.price) : 0;
   const grandTotal = subtotalDollar + shippingDollar;
-
   let shippingDisplay;
   if (!shipping || shipping.price === null)  shippingDisplay = 'TBC';
   else if (shipping.isQuote)                 shippingDisplay = 'Manual Quote — To Be Confirmed';
   else                                       shippingDisplay = shipping.priceDisplay || `$${shippingDollar.toFixed(2)}`;
-
   return {
     subtotal_cents:      subtotalCents,
     subtotal_display:    `$${subtotalDollar.toFixed(2)}`,
@@ -245,26 +215,20 @@ function buildPdfTotals(cart, shipping) {
       : `$${grandTotal.toFixed(2)}`,
   };
 }
-
 // ─── MAIN ROUTE HANDLER ───────────────────────────────────────────────────────
-
 async function handleSubmitOrder(req, res) {
   try {
     const { formType, formData, cart } = req.body;
-
     if (!formType || !formData) {
       return res.status(400).json({ success: false, message: 'Missing formType or formData.' });
     }
-
     const safeCart = cart || { items: [], total_price: 0 };
-
     // ── Step 1: Extract shipping ──────────────────────────────────────────────
     const shipping = extractShippingLine(formData);
     console.log('[submit-order] Shipping extracted:', {
       category: shipping.categoryLabel, zone: shipping.zoneLabel,
       price: shipping.priceDisplay, isQuote: shipping.isQuote, title: shipping.title,
     });
-
     // ── BULKY / FREIGHT FLAG ───────────────────────────────────────────────────
     // shipping.isQuote is true whenever the winning shipping category is
     // 'bulky'. Because category ranking always promotes the highest-ranked
@@ -272,11 +236,9 @@ async function handleSubmitOrder(req, res) {
     // the cart guarantees isQuote === true here — so this flag is equivalent
     // to "does this order contain any Bulky/Freight item".
     const hasBulkyItem = shipping.isQuote;
-
     if (hasBulkyItem) {
       console.log('[submit-order] 🚛 Bulky/Freight item detected — customer email will be suppressed.');
     }
-
     // ── Step 2: Create Shopify Draft Order ─────────────────────────────────────
     // Draft order is created for BOTH standard and bulky/freight orders, so the
     // bulky order is visible in Shopify awaiting manual review.
@@ -287,7 +249,6 @@ async function handleSubmitOrder(req, res) {
     } catch (shopifyErr) {
       console.error('[submit-order] ❌ Shopify draft order FAILED:', shopifyErr.message);
     }
-
     // Step 3: Generate PDF
     let pdfBuffer = null;
     try {
@@ -296,7 +257,6 @@ async function handleSubmitOrder(req, res) {
     } catch (pdfErr) {
       console.error('[submit-order] ❌ PDF generation FAILED:', pdfErr.message);
     }
-
     // ── Step 4: Send email ──────────────────────────────────────────────────────
     // Standard (S/M/L) orders: customer receives the invoice email (unchanged).
     // Bulky/Freight orders: customer receives NO email; instead the internal
@@ -304,7 +264,7 @@ async function handleSubmitOrder(req, res) {
     if (hasBulkyItem) {
       try {
         await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer });
-        console.log('[submit-order] ✅ Internal bulky-item notification sent to web@agedcareandmedical.com.au');  //change to contact@agedcareandmedical.com.au
+        console.log('[submit-order] ✅ Internal bulky-item notification sent to contact@agedcareandmedical.com.au');
       } catch (emailErr) {
         console.error('[submit-order] ❌ Internal bulky-item notification FAILED:', emailErr.message);
       }
@@ -316,7 +276,6 @@ async function handleSubmitOrder(req, res) {
         console.error('[submit-order] ❌ Invoice email FAILED:', emailErr.message);
       }
     }
-
     // Step 5: Respond
     return res.json({
       success:          true,
@@ -331,13 +290,11 @@ async function handleSubmitOrder(req, res) {
         display:  shipping.priceDisplay,
       },
     });
-
   } catch (err) {
     console.error('[submit-order] Unhandled error:', err);
     return res.status(500).json({ success: false, message: 'Internal server error.' });
   }
 }
-
 // ─── ROUTER ───────────────────────────────────────────────────────────────────
 router.post('/submit-order', handleSubmitOrder);
 module.exports = router;
