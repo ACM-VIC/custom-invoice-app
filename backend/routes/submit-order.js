@@ -12,15 +12,15 @@ const SHOPIFY_ACCESS_TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
 
 // ─── STARTUP GUARD ────────────────────────────────────────────────────────────
-if (!SHOPIFY_DOMAIN) {
+if (!SHOPIFY_SHOP_DOMAIN) {
   console.error(
     '[submit-order] ⚠️  SHOPIFY_STORE_DOMAIN is not set. ' +
     'Set it in Azure Portal → App Service → Configuration → Application Settings.'
   );
 }
-if (!SHOPIFY_TOKEN) {
+if (!SHOPIFY_ACCESS_TOKEN) {
   console.error(
-    '[submit-order] ⚠️  SHOPIFY_ADMIN_TOKEN is not set. ' +
+    '[submit-order] ⚠️  SHOPIFY_ACCESS_TOKEN is not set. ' +
     'Set it in Azure Portal → App Service → Configuration.'
   );
 }
