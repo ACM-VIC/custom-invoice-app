@@ -263,8 +263,8 @@ async function handleSubmitOrder(req, res) {
     // team gets the invoice + PDF for manual review.
     if (hasBulkyItem) {
       try {
-        await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer });
-        console.log('[submit-order] ✅ Internal bulky-item notification sent to web@agedcareandmedical.com.au'); //change to contact
+        await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer, shipping });
+        console.log('[submit-order] ✅ Internal bulky-item notification sent to contact@agedcareandmedical.com.au');
       } catch (emailErr) {
         console.error('[submit-order] ❌ Internal bulky-item notification FAILED:', emailErr.message);
       }

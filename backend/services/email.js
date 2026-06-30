@@ -163,28 +163,127 @@ async function sendInvoice({ formType, formData, draftOrder, pdfBuffer }) {
   return info;
 }
 
+function buildBulkyNotificationHtml({ formType, formData, draftOrder, shipping }) {
+  const store       = storeMeta();
+  const billingType = formType === 'ndis' ? 'NDIS' : 'Aged Care';
+  const submittedAt = new Date().toLocaleString('en-AU', {
+    timeZone: 'Australia/Melbourne',
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  const categoryLabel = (shipping && shipping.categoryLabel) || 'Bulky / Freight';
+  const zoneLabel      = (shipping && shipping.zoneLabel) || '—';
+  const drivingItem    = shipping && shipping.drivingItem;
+  const overrideNotes  = shipping && shipping.overrideNotes;
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 14px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
+        .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+        .header { background: #6A1B9A; color: #fff; padding: 24px 28px; }
+        .header h1 { margin: 0; font-size: 19px; font-weight: 700; }
+        .header p  { margin: 6px 0 0; font-size: 13px; opacity: .8; }
+        .alert-banner { background: #4A148C; color: #fff; padding: 12px 28px; font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+        .body { padding: 24px 28px; }
+        .body p { line-height: 1.6; margin: 0 0 14px; }
+        .highlight { background: #F3E5F5; border-left: 3px solid #6A1B9A; padding: 12px 16px; border-radius: 4px; margin: 16px 0; font-size: 13px; }
+        .highlight strong { display: block; margin-bottom: 4px; font-size: 12px; color: #6A1B9A; text-transform: uppercase; letter-spacing: .5px; }
+        table.detail { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        table.detail td { font-size: 13px; vertical-align: top; padding: 4px 0; }
+        .action-banner { background: #6A1B9A; color: #fff; padding: 16px 28px; font-size: 13px; line-height: 1.6; }
+        .action-banner strong { display: block; font-size: 15px; margin-bottom: 6px; }
+        .footer { background: #f5f5f5; padding: 16px 28px; font-size: 11px; color: #999; text-align: center; }
+        .notes-box { background: #f9f9f9; border-left: 3px solid #ccc; border-radius: 4px; padding: 10px 14px; font-size: 12px; color: #555; margin-top: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="header">
+          <h1>🚛 Manual Quotation Required</h1>
+          <p>${store.name} · ${billingType} Order · Submitted ${submittedAt} (AEST)</p>
+        </div>
+
+        <div class="alert-banner">
+          ⚠️ This order contains a BULKY / FREIGHT item and is NOT following the standard invoice workflow.
+          The customer has NOT been emailed an invoice. A manual freight quote must be arranged before contacting them.
+        </div>
+
+        <div class="body">
+          <p>
+            A Draft Order has already been created in Shopify for reference, and the standard PDF invoice
+            is attached for the team's convenience — but it must <strong>not</strong> be sent to the customer
+            as-is, since the shipping cost shown does not reflect the actual freight required.
+          </p>
+
+          <div class="highlight">
+            <strong>Order Reference</strong>
+            ${draftOrder?.name || '—'}
+          </div>
+
+          <div class="highlight">
+            <strong>Shipping Category Triggering This Review</strong>
+            ${categoryLabel}${zoneLabel ? ` — ${zoneLabel}` : ''}
+            ${drivingItem ? `<br><span style="font-size:12px;color:#4A148C;">Driving item: ${drivingItem}</span>` : ''}
+          </div>
+
+          <table class="detail">
+            <tr><td style="color:#555;width:150px;">Customer Name</td><td>${formData.submitter_full_name || '—'}</td></tr>
+            <tr><td style="color:#555;">Customer Email</td><td>${formData.submitter_email || '—'}</td></tr>
+            <tr><td style="color:#555;">Customer Phone</td><td>${formData.submitter_phone || '—'}</td></tr>
+            <tr><td style="color:#555;">Delivery Address</td><td>${formData.address_line1 || '—'}, ${formData.suburb || ''} ${formData.state || ''} ${formData.postcode || ''}</td></tr>
+          </table>
+
+          ${overrideNotes ? `
+          <div class="notes-box">
+            📋 <strong>Freight notes from customer:</strong><br>${overrideNotes}
+          </div>
+          ` : ''}
+        </div>
+
+        <div class="action-banner">
+          <strong>✅ Next Steps</strong>
+          1. Calculate the freight cost for this item and delivery location.<br>
+          2. Update the Draft Order in Shopify with the correct shipping line.<br>
+          3. Contact the customer directly with the confirmed quote before sending any invoice.
+        </div>
+
+        <div class="footer">
+          Internal use only — ${store.name} · ABN ${store.abn} · ${store.email}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 /**
  * sendInternalInvoiceNotification — Bulky / Freight path only.
- * Reuses the same invoice email layout and PDF attachment as sendInvoice(),
- * but sends to the fixed internal review address instead of the customer.
- * Used whenever the order contains a Bulky/Freight item, so the customer
- * receives no email and the team can manually review before contacting them.
+ * Uses a dedicated "manual quotation required" template (NOT the customer
+ * invoice layout), since this order intentionally deviates from the standard
+ * automated workflow. The Draft Order + PDF are still attached for reference,
+ * but the email itself flags that manual review and freight pricing are
+ * needed before any customer contact.
  */
-async function sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer }) {
+async function sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer, shipping }) {
   const transporter  = createTransporter();
   const store        = storeMeta();
   const billingType  = formType === 'ndis' ? 'NDIS' : 'Aged Care';
-  const internalTo   = 'web@agedcareandmedical.com.au'; /**change to contact@agedcareandmedical.com.au */
+  const internalTo   = 'contact@agedcareandmedical.com.au';
   const customerName = formData.submitter_full_name || formData.participant_full_name || 'Customer';
 
   const mailOptions = {
     from:    `"${store.name} Orders" <${store.from}>`,
     to:      internalTo,
-    subject: `🚛 BULKY ITEM — ${billingType} Order ${draftOrder.name} from ${customerName} (awaiting manual review)`,
-    html:    buildInvoiceEmailHtml({ formType, formData, draftOrder }),
+    subject: `🚛 MANUAL QUOTE REQUIRED — ${billingType} Order ${draftOrder?.name || ''} from ${customerName}`,
+    html:    buildBulkyNotificationHtml({ formType, formData, draftOrder, shipping }),
     attachments: pdfBuffer
       ? [{
-          filename:    `Invoice-${draftOrder.name}.pdf`,
+          filename:    `Invoice-${draftOrder?.name || 'draft'}.pdf`,
           content:     pdfBuffer,
           contentType: 'application/pdf',
         }]
