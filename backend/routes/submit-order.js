@@ -1,38 +1,16 @@
-/**
- * routes/submit-order.js  —  Backend handler for NDIS / Aged Care order submissions
- *
- * What this module does:
- *  1. Receives the form payload (formData, cart) from the frontend
- *  2. Extracts shipping details from formData fields set by the shipping module
- *  3. Creates a Shopify Draft Order with line_items, shipping_address, shipping_line
- *  4. Generates a PDF invoice via services/pdf.js  (was commented out — now wired in)
- *  5. Sends the confirmation email via services/email.js (was commented out — now wired in)
- *
- * ─── ENVIRONMENT VARIABLES REQUIRED ─────────────────────────────────────────
- *  SHOPIFY_STORE_DOMAIN   e.g. your-store.myshopify.com   ← must NOT include https://
- *  SHOPIFY_ADMIN_TOKEN    Admin API access token (write_draft_orders scope)
- *  SHOPIFY_API_VERSION    e.g. 2024-01  (falls back to '2024-01' if missing)
- *
- *  SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER / SMTP_PASS
- *  EMAIL_FROM / EMAIL_ORDERS_CC
- *  (see services/email.js for full list)
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
 'use strict';
 
 const express    = require('express');
 const router     = express.Router();
 
-// ── Service imports ───────────────────────────────────────────────────────────
-// These were missing / commented out before — this is what caused the bug.
-const { generateInvoice }   = require('../services/pdf');    // Puppeteer + Handlebars
-const { sendInvoice }  = require('../services/email');  // Nodemailer
+const { generateInvoice }                                          = require('../services/pdf');
+const { sendInvoice, sendQuoteRequest, sendQuoteAcknowledgement, sendInternalInvoiceNotification } = require('../services/email');
 
 // ─── ENV VARIABLES ────────────────────────────────────────────────────────────
-const SHOPIFY_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
-const SHOPIFY_TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN;
+const SHOPIFY_DOMAIN  = process.env.SHOPIFY_STORE_DOMAIN;
+const SHOPIFY_TOKEN   = process.env.SHOPIFY_ADMIN_TOKEN;
 const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
+
 // ─── STARTUP GUARD ────────────────────────────────────────────────────────────
 if (!SHOPIFY_DOMAIN) {
   console.error(
@@ -65,7 +43,9 @@ function extractShippingLine(formData) {
     zone:          formData.shipping_zone           || '',
     zoneLabel:     formData.shipping_zone_label     || '',
     isQuote,
-    overrideNotes: formData.shipping_override_notes || '',
+    overrideNotes:   formData.shipping_override_notes   || '',
+    upgradeSummary:  formData.shipping_upgrade_summary  || '',
+    drivingItem:     formData.shipping_driving_item     || '',
   };
 }
 
@@ -266,7 +246,6 @@ function buildPdfTotals(cart, shipping) {
   };
 }
 
-
 // ─── MAIN ROUTE HANDLER ───────────────────────────────────────────────────────
 
 async function handleSubmitOrder(req, res) {
@@ -277,6 +256,8 @@ async function handleSubmitOrder(req, res) {
       return res.status(400).json({ success: false, message: 'Missing formType or formData.' });
     }
 
+    const safeCart = cart || { items: [], total_price: 0 };
+
     // ── Step 1: Extract shipping ──────────────────────────────────────────────
     const shipping = extractShippingLine(formData);
     console.log('[submit-order] Shipping extracted:', {
@@ -284,67 +265,69 @@ async function handleSubmitOrder(req, res) {
       price: shipping.priceDisplay, isQuote: shipping.isQuote, title: shipping.title,
     });
 
-    // ── Step 2: Create Shopify Draft Order ────────────────────────────────────
-    let draftOrder = null;
-    try {
-      draftOrder = await createShopifyDraftOrder({
-        formType,
-        formData,
-        cart: cart || { items: [], total_price: 0 },
-        shipping,
-      });
-      console.log(`[submit-order] Shopify draft order created: ${draftOrder.name} (${draftOrder.id})`);
-    } catch (shopifyErr) {
-      // Log clearly — order creation failed but we still attempt PDF + email
-      console.error('[submit-order] ❌ Shopify draft order FAILED:', shopifyErr.message);
-      // draftOrder stays null; PDF + email will proceed without an order ref
+    // ── BULKY / FREIGHT FLAG ───────────────────────────────────────────────────
+    // shipping.isQuote is true whenever the winning shipping category is
+    // 'bulky'. Because category ranking always promotes the highest-ranked
+    // item to the winning category, a single Bulky/Freight item anywhere in
+    // the cart guarantees isQuote === true here — so this flag is equivalent
+    // to "does this order contain any Bulky/Freight item".
+    const hasBulkyItem = shipping.isQuote;
+
+    if (hasBulkyItem) {
+      console.log('[submit-order] 🚛 Bulky/Freight item detected — customer email will be suppressed.');
     }
 
-    // ── Step 3: Build PDF data ────────────────────────────────────────────────
-    const safeCart       = cart || { items: [], total_price: 0 };
-    const pdfShippingRow = buildPdfShippingRow(shipping);
-    const pdfTotals      = buildPdfTotals(safeCart, shipping);
+    // ── Step 2: Create Shopify Draft Order ─────────────────────────────────────
+    // Draft order is created for BOTH standard and bulky/freight orders, so the
+    // bulky order is visible in Shopify awaiting manual review.
+    let draftOrder = null;
+    try {
+      draftOrder = await createShopifyDraftOrder({ formType, formData, cart: safeCart, shipping });
+      console.log(`[submit-order] Shopify draft order created: ${draftOrder.name} (${draftOrder.id})`);
+    } catch (shopifyErr) {
+      console.error('[submit-order] ❌ Shopify draft order FAILED:', shopifyErr.message);
+    }
 
-    // ── Step 4a: Generate PDF ─────────────────────────────────────────────────
-    // FIX: this was a comment block before — now actually called
+    // Step 3: Generate PDF
     let pdfBuffer = null;
     try {
-      pdfBuffer = await generateInvoice({
-        formType,
-        formData,
-        draftOrder,   // may be null if Shopify failed — pdf.js handles gracefully
-      });
+      pdfBuffer = await generateInvoice({ formType, formData, draftOrder });
       console.log(`[submit-order] ✅ PDF generated (${pdfBuffer.length} bytes)`);
     } catch (pdfErr) {
       console.error('[submit-order] ❌ PDF generation FAILED:', pdfErr.message);
-      // Continue — customer still gets an email, just without the PDF attachment
     }
 
-    // ── Step 4b: Send confirmation email ─────────────────────────────────────
-    // FIX: this was a comment block before — now actually called
-    try {
-      await sendInvoice({
-        formType,
-        formData,
-        draftOrder,
-        pdfBuffer,
-      });
-      console.log(`[submit-order] ✅ Email sent to ${formData.submitter_email}`);
-    } catch (emailErr) {
-      console.error('[submit-order] ❌ Email send FAILED:', emailErr.message);
-      // Don't fail the whole request just because email failed
+    // ── Step 4: Send email ──────────────────────────────────────────────────────
+    // Standard (S/M/L) orders: customer receives the invoice email (unchanged).
+    // Bulky/Freight orders: customer receives NO email; instead the internal
+    // team gets the invoice + PDF for manual review.
+    if (hasBulkyItem) {
+      try {
+        await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer });
+        console.log('[submit-order] ✅ Internal bulky-item notification sent to web@agedcareandmedical.com.au');  //change to contact@agedcareandmedical.com.au
+      } catch (emailErr) {
+        console.error('[submit-order] ❌ Internal bulky-item notification FAILED:', emailErr.message);
+      }
+    } else {
+      try {
+        await sendInvoice({ formType, formData, draftOrder, pdfBuffer });
+        console.log(`[submit-order] ✅ Invoice email sent to ${formData.submitter_email}`);
+      } catch (emailErr) {
+        console.error('[submit-order] ❌ Invoice email FAILED:', emailErr.message);
+      }
     }
 
-    // ── Step 5: Respond ───────────────────────────────────────────────────────
+    // Step 5: Respond
     return res.json({
       success:          true,
       draft_order_id:   draftOrder?.id   || null,
       draft_order_name: draftOrder?.name || null,
+      bulky_item_detected: hasBulkyItem,
       shipping_applied: {
         category: shipping.categoryLabel,
         zone:     shipping.zoneLabel,
         title:    shipping.title,
-        price:    shipping.isQuote ? 'quote' : shipping.price,
+        price:    shipping.price,
         display:  shipping.priceDisplay,
       },
     });

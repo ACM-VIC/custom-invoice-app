@@ -8,36 +8,6 @@
  *   sendQuoteAcknowledgement() — Quote path:  customer acknowledgement (no PDF)
  */
 
-/**
- * =========================================
- * EMAIL SERVICE (SMTP + ATTACHMENTS)
- * =========================================
- *
- * PURPOSE:
- * Sends invoice emails with PDF attachments to:
- * - Customer (normal path)
- * - Plan Manager / Provider (NDIS / Aged Care, normal path)
- * - Internal team (quote/bulky path only)
- *
- * -----------------------------------------
- * WHAT YOU EDIT HERE
- * -----------------------------------------
- * SMTP SETTINGS:
- * - email credentials (env vars)
- * - Outlook / Office365 config
- *
- * EMAIL CONTENT:
- * - subject lines
- * - HTML email templates
- * - recipient logic per flow
- *
- * -----------------------------------------
- * DO NOT TOUCH
- * -----------------------------------------
- * - attachment handling (PDF buffer logic)
- * - transporter creation
- */
-
 const nodemailer = require('nodemailer');
 
 // ── Transporter (Outlook / Office 365 SMTP) ──────────────────────────────────
@@ -59,10 +29,6 @@ function createTransporter() {
     },
   });
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SHARED HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
 
 function storeMeta() {
   return {
@@ -197,10 +163,45 @@ async function sendInvoice({ formType, formData, draftOrder, pdfBuffer }) {
   return info;
 }
 
+/**
+ * sendInternalInvoiceNotification — Bulky / Freight path only.
+ * Reuses the same invoice email layout and PDF attachment as sendInvoice(),
+ * but sends to the fixed internal review address instead of the customer.
+ * Used whenever the order contains a Bulky/Freight item, so the customer
+ * receives no email and the team can manually review before contacting them.
+ */
+async function sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer }) {
+  const transporter  = createTransporter();
+  const store        = storeMeta();
+  const billingType  = formType === 'ndis' ? 'NDIS' : 'Aged Care';
+  const internalTo   = 'web@agedcareandmedical.com.au'; /**change to contact@agedcareandmedical.com.au */
+  const customerName = formData.submitter_full_name || formData.participant_full_name || 'Customer';
+
+  const mailOptions = {
+    from:    `"${store.name} Orders" <${store.from}>`,
+    to:      internalTo,
+    subject: `🚛 BULKY ITEM — ${billingType} Order ${draftOrder.name} from ${customerName} (awaiting manual review)`,
+    html:    buildInvoiceEmailHtml({ formType, formData, draftOrder }),
+    attachments: pdfBuffer
+      ? [{
+          filename:    `Invoice-${draftOrder.name}.pdf`,
+          content:     pdfBuffer,
+          contentType: 'application/pdf',
+        }]
+      : [],
+  };
+
+  if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalTo) {
+    mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
+  }
+
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[email] Internal bulky-item notification sent: ${info.messageId} → ${internalTo}`);
+  return info;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. QUOTE PATH — Internal team email
-//    Sent to INTERNAL_QUOTE_EMAIL so the team can quote and create the draft
-//    order manually.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
@@ -212,7 +213,6 @@ function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
     hour: '2-digit', minute: '2-digit',
   });
 
-  // Build cart rows HTML
   const cartRowsHtml = (cart.items || []).map(item => `
     <tr>
       <td style="padding:8px 10px;border-bottom:1px solid #eee;">${item.product_title || item.title}</td>
@@ -224,7 +224,6 @@ function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
 
   const cartSubtotal = ((cart.total_price || 0) / 100).toFixed(2);
 
-  // Funding-specific detail rows
   let fundingDetail = '';
   if (formType === 'ndis') {
     fundingDetail = `
@@ -295,7 +294,6 @@ function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
           Do NOT create a Shopify draft order until the freight cost has been confirmed with the customer.
         </div>
 
-        <!-- CUSTOMER DETAILS -->
         <div class="section">
           <div class="section-title">Customer / Submitter</div>
           <table class="detail">
@@ -305,7 +303,6 @@ function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
           </table>
         </div>
 
-        <!-- PARTICIPANT / DELIVERY -->
         <div class="section">
           <div class="section-title">Participant / Delivery Details</div>
           <table class="detail">
@@ -316,7 +313,6 @@ function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
           </table>
         </div>
 
-        <!-- FUNDING -->
         <div class="section">
           <div class="section-title">${billingType} Funding Details</div>
           <table class="detail">
@@ -324,7 +320,6 @@ function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
           </table>
         </div>
 
-        <!-- SHIPPING DETAILS -->
         <div class="shipping-box">
           <strong>🚛 Shipping / Freight Details</strong>
           <div class="row">
@@ -345,7 +340,6 @@ function buildQuoteRequestHtml({ formType, formData, cart, shipping }) {
           ` : ''}
         </div>
 
-        <!-- CART ITEMS -->
         <div class="section">
           <div class="section-title">Cart Items</div>
         </div>
@@ -417,7 +411,6 @@ async function sendQuoteRequest({ formType, formData, cart, shipping }) {
     html:    buildQuoteRequestHtml({ formType, formData, cart, shipping }),
   };
 
-  // BCC internal orders address if configured separately
   if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalEmail) {
     mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
   }
@@ -563,4 +556,4 @@ async function sendQuoteAcknowledgement({ formType, formData, shipping }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-module.exports = { sendInvoice, sendQuoteRequest, sendQuoteAcknowledgement };
+module.exports = { sendInvoice, sendQuoteRequest, sendQuoteAcknowledgement, sendInternalInvoiceNotification };
