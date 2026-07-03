@@ -304,6 +304,16 @@
       color: var(--text-mid);
       background: #fab58d34;
     }
+    .rental-note {
+      margin-top: 20px;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: var(--text-mid);
+      background: #fff7f3;
+      border-left: 3px solid var(--accent);
+      line-height: 1.6;
+    }
     .footer {
       margin-top: auto;
       padding-top: 32px;
@@ -328,7 +338,7 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <span class="sidebar-text">
-      {{#if isNdis}}NDIS INVOICE{{else}}AGED CARE &amp; MEDICAL INVOICE{{/if}}
+      {{#if isNdis}}NDIS INVOICE{{else}}{{#if isRental}}RENTAL ENQUIRY REFERENCE{{else}}AGED CARE &amp; MEDICAL INVOICE{{/if}}{{/if}}
     </span>
   </div>
 
@@ -341,7 +351,7 @@
              alt="Aged Care &amp; Medical" />
       </div>
       <div class="invoice-meta">
-        <div class="invoice-title">TAX INVOICE</div>
+        <div class="invoice-title">{{#if isRental}}RENTAL ENQUIRY{{else}}TAX INVOICE{{/if}}</div>
         <div class="invoice-num">{{invoiceNumber}}</div>
         <div class="biz-details">
           <strong>{{storeName}}</strong>
@@ -356,25 +366,25 @@
     <!-- DATE BAR -->
     <div class="date-bar">
       <div class="date-bar-item">
-        <div class="date-label">Issued Date</div>
+        <div class="date-label">{{#if isRental}}Submitted Date{{else}}Issued Date{{/if}}</div>
         <div class="date-value">{{invoiceDate}}</div>
       </div>
       <div class="date-bar-item">
-        <div class="date-label">Due Date</div>
+        <div class="date-label">{{#if isRental}}Follow-up By{{else}}Due Date{{/if}}</div>
         <div class="date-value">{{dueDate}}</div>
       </div>
       <div class="date-bar-item">
-        <div class="date-label">Payment Terms</div>
-        <div class="date-value">{{paymentTerms}}</div>
+        <div class="date-label">{{#if isRental}}Status{{else}}Payment Terms{{/if}}</div>
+        <div class="date-value">{{#if isRental}}Quote Pending{{else}}{{paymentTerms}}{{/if}}</div>
       </div>
     </div>
 
 <!-- BILL TO / DELIVER TO -->
 <div class="parties">
-  <!-- BILL TO: Changes based on NDIS status -->
+  <!-- LEFT PARTY: Changes based on form type -->
   <div class="party-box">
-    <div class="party-title"><span class="party-dot"></span> 
-      {{#if isNdis}}Payable By (Plan Manager){{else}}Bill To{{/if}}
+    <div class="party-title"><span class="party-dot"></span>
+      {{#if isNdis}}Payable By (Plan Manager){{else}}{{#if isRental}}Enquiry Submitted By{{else}}Bill To{{/if}}{{/if}}
     </div>
     <div class="party-content">
       {{#if isNdis}}
@@ -382,18 +392,24 @@
         {{#if ndis.providerEmail}}Email: {{ndis.providerEmail}}<br>{{/if}}
         {{#if billTo.address}}{{billTo.address}}{{/if}}
       {{else}}
-        <strong>{{billTo.name}}</strong>
-        {{#if billTo.address}}{{billTo.address}}<br>{{/if}}
-        {{#if billTo.email}}{{billTo.email}}<br>{{/if}}
-        {{#if billTo.phone}}{{billTo.phone}}{{/if}}
+        {{#if isRental}}
+          <strong>{{billTo.name}}</strong>
+          {{#if billTo.email}}Email: {{billTo.email}}<br>{{/if}}
+          {{#if billTo.phone}}{{billTo.phone}}{{/if}}
+        {{else}}
+          <strong>{{billTo.name}}</strong>
+          {{#if billTo.address}}{{billTo.address}}<br>{{/if}}
+          {{#if billTo.email}}{{billTo.email}}<br>{{/if}}
+          {{#if billTo.phone}}{{billTo.phone}}{{/if}}
+        {{/if}}
       {{/if}}
     </div>
   </div>
 
-  <!-- DELIVER TO: Participant details for NDIS -->
+  <!-- RIGHT PARTY: Delivery details -->
   <div class="party-box">
-    <div class="party-title"><span class="party-dot"></span> 
-      {{#if isNdis}}NDIS Participant / Deliver To{{else}}Deliver To{{/if}}
+    <div class="party-title"><span class="party-dot"></span>
+      {{#if isNdis}}NDIS Participant / Deliver To{{else}}{{#if isRental}}Delivery Address{{else}}Deliver To{{/if}}{{/if}}
     </div>
     <div class="party-content">
       <strong>{{deliverTo.name}}</strong>
@@ -409,7 +425,7 @@
     <!-- SERVICE BOX — rendered server-side by Handlebars, no JS needed -->
     <div class="service-box">
       <div class="service-box-title">
-        {{#if isNdis}}NDIS Service Details{{else}}Aged Care Billing Information{{/if}}
+        {{#if isNdis}}NDIS Service Details{{else}}{{#if isRental}}Rental Enquiry Details{{else}}Aged Care Billing Information{{/if}}{{/if}}
       </div>
       <div class="service-fields">
         {{#if isNdis}}
@@ -434,26 +450,45 @@
             <div class="service-field-value">{{ndis.providerEmail}}</div>
           </div>
         {{else}}
-          <div>
-            <div class="service-field-label">Client Name</div>
-            <div class="service-field-value">{{billTo.name}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">Client ID</div>
-            <div class="service-field-value">{{agedCare.clientId}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">Funding Type</div>
-            <div class="service-field-value">{{agedCare.fundingType}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">Provider Name</div>
-            <div class="service-field-value">{{agedCare.providerName}}</div>
-          </div>
-          <div>
-            <div class="service-field-label">Reference</div>
-            <div class="service-field-value">{{reference}}</div>
-          </div>
+          {{#if isRental}}
+            <div>
+              <div class="service-field-label">Item Enquired</div>
+              <div class="service-field-value">{{rental.productTitle}}</div>
+            </div>
+            <div>
+              <div class="service-field-label">Person Placing Order</div>
+              <div class="service-field-value">{{rental.ordererRole}}</div>
+            </div>
+            <div>
+              <div class="service-field-label">Requested Time Frame</div>
+              <div class="service-field-value">{{rental.deliveryTimeframe}}</div>
+            </div>
+            <div>
+              <div class="service-field-label">Has NDIS</div>
+              <div class="service-field-value">{{rental.hasNdis}}</div>
+            </div>
+          {{else}}
+            <div>
+              <div class="service-field-label">Client Name</div>
+              <div class="service-field-value">{{billTo.name}}</div>
+            </div>
+            <div>
+              <div class="service-field-label">Client ID</div>
+              <div class="service-field-value">{{agedCare.clientId}}</div>
+            </div>
+            <div>
+              <div class="service-field-label">Funding Type</div>
+              <div class="service-field-value">{{agedCare.fundingType}}</div>
+            </div>
+            <div>
+              <div class="service-field-label">Provider Name</div>
+              <div class="service-field-value">{{agedCare.providerName}}</div>
+            </div>
+            <div>
+              <div class="service-field-label">Reference</div>
+              <div class="service-field-value">{{reference}}</div>
+            </div>
+          {{/if}}
         {{/if}}
       </div>
     </div>
@@ -465,7 +500,7 @@
           <tr>
             <th>Description</th>
             <th class="right">QTY</th>
-            <th class="right">Unit Price</th>
+            <th class="right">{{#if isRental}}List Price{{else}}Unit Price{{/if}}</th>
             <th class="right">Total</th>
           </tr>
         </thead>
@@ -529,12 +564,20 @@
 
         <hr class="totals-divider" />
         <div class="totals-row grand">
-          <span class="label">Total Due</span>
+          <span class="label">{{#if isRental}}List Price Total{{else}}Total Due{{/if}}</span>
           <span class="value">{{total}} AUD</span>
         </div>
         <div class="gst-note">GST included: {{tax}}</div>
       </div>
     </div>
+
+    {{#if isRental}}
+    <div class="rental-note">
+      <strong style="display:block;font-size:12px;font-weight:600;color:var(--text-dark);margin-bottom:4px;">Reference document only</strong>
+      This PDF reflects the product's current list price and is for internal reference only. No payment has been taken.
+      Final rental pricing, availability and hire terms must be confirmed with the customer before any invoice is issued.
+    </div>
+    {{/if}}
 
     <!-- NOTES -->
     {{#if customerNotes}}
@@ -545,6 +588,7 @@
     {{/if}}
     <br><br>
 
+{{#unless isRental}}
 <!-- BANK DETAILS -->
 <div class="payment-details" style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed var(--grey-line);">
     <strong style="color: var(--text-dark); font-family: 'Montserrat'; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Bank Details</strong>
@@ -557,14 +601,18 @@
             Email Remittance to: accounts@agedcareandmedical.com.au
         </div>
     </div>
-</div>  
+</div>
+{{/unless}}
 
-      
 
 
     <!-- FOOTER -->
     <div class="footer">
-      Thank you for choosing {{storeName}}. Please include invoice number: {{invoiceNumber}} for all payments.
+      {{#if isRental}}
+        This is an internal reference document for {{storeName}} — enquiry reference: {{invoiceNumber}}.
+      {{else}}
+        Thank you for choosing {{storeName}}. Please include invoice number: {{invoiceNumber}} for all payments.
+      {{/if}}
     </div>
 
   </div>

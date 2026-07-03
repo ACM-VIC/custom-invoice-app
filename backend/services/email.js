@@ -658,7 +658,7 @@ async function sendQuoteAcknowledgement({ formType, formData, shipping }) {
 // 4. RENTAL PATH — Internal team notification (from rental-enquiry-modal.liquid)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildRentalNotificationHtml({ formData, product, draftOrder }) {
+function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) {
   const store       = storeMeta();
   const submittedAt = new Date().toLocaleString('en-AU', {
     timeZone: 'Australia/Melbourne',
@@ -769,6 +769,7 @@ function buildRentalNotificationHtml({ formData, product, draftOrder }) {
           2. Contact the customer at <strong>${formData.email}</strong> / <strong>${formData.phone || '—'}</strong> with a quote.<br>
           3. Once agreed, update the draft order in Shopify with the correct pricing and hire terms.
           ${shopAdminOrderUrl ? `<br>4. <a href="${shopAdminOrderUrl}">Open the draft order in Shopify →</a>` : '<br>4. Note: draft order creation failed — check logs and create manually if needed.'}
+          ${hasPdf ? '<br>5. A reference PDF (using the item\'s current list price, not a confirmed quote) is attached below.' : ''}
         </div>
 
         <div class="footer">
@@ -783,10 +784,13 @@ function buildRentalNotificationHtml({ formData, product, draftOrder }) {
 /**
  * sendRentalEnquiryNotification — Rental path only.
  * Notifies the internal team with full enquiry + draft order details.
+ * Mirrors sendInternalInvoiceNotification's pattern for bulky/freight orders:
+ * a reference PDF (based on current list price, not a confirmed quote) is
+ * attached when available, but this is never sent to the customer.
  * Uses the dedicated rental team inbox if set, otherwise falls back to the
  * general contact/internal address used for bulky-item notifications.
  */
-async function sendRentalEnquiryNotification({ formData, product, draftOrder }) {
+async function sendRentalEnquiryNotification({ formData, product, draftOrder, pdfBuffer }) {
   const transporter = createTransporter();
   const store        = storeMeta();
   const internalTo   = process.env.RENTAL_TEAM_EMAIL || 'contact@agedcareandmedical.com.au';
@@ -796,7 +800,14 @@ async function sendRentalEnquiryNotification({ formData, product, draftOrder }) 
     from:    `"${store.name} Rentals" <${store.from}>`,
     to:      internalTo,
     subject: `🛠️ RENTAL ENQUIRY — ${product?.title || 'Item'} from ${customerName}`,
-    html:    buildRentalNotificationHtml({ formData, product, draftOrder }),
+    html:    buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf: !!pdfBuffer }),
+    attachments: pdfBuffer
+      ? [{
+          filename:    `Rental-Enquiry-${draftOrder?.name || 'draft'}.pdf`,
+          content:     pdfBuffer,
+          contentType: 'application/pdf',
+        }]
+      : [],
   };
 
   if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalTo) {
