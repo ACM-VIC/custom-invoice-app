@@ -655,4 +655,264 @@ async function sendQuoteAcknowledgement({ formType, formData, shipping }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-module.exports = { sendInvoice, sendQuoteRequest, sendQuoteAcknowledgement, sendInternalInvoiceNotification };
+// 4. RENTAL PATH — Internal team notification (from rental-enquiry-modal.liquid)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildRentalNotificationHtml({ formData, product, draftOrder }) {
+  const store       = storeMeta();
+  const submittedAt = new Date().toLocaleString('en-AU', {
+    timeZone: 'Australia/Melbourne',
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  const hasNdis = formData.has_ndis === 'Yes';
+  const shopAdminOrderUrl = draftOrder
+    ? `https://${process.env.SHOPIFY_SHOP_DOMAIN}/admin/draft_orders/${draftOrder.id}`
+    : null;
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 14px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
+        .wrap { max-width: 620px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+        .header { background: #DC4E00; color: #fff; padding: 24px 28px; }
+        .header h1 { margin: 0; font-size: 19px; font-weight: 700; }
+        .header p  { margin: 6px 0 0; font-size: 13px; opacity: .8; }
+        .alert-banner { background: #B83E00; color: #fff; padding: 12px 28px; font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+        .section { padding: 20px 28px 0; }
+        .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #DC4E00; border-bottom: 2px solid #f2e0d8; padding-bottom: 6px; margin-bottom: 12px; }
+        table.detail { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+        table.detail td { font-size: 13px; vertical-align: top; padding: 4px 0; }
+        .notes-box { margin: 0 28px 20px; background: #f9f9f9; border-left: 3px solid #ccc; border-radius: 4px; padding: 10px 14px; font-size: 13px; color: #555; }
+        .action-banner { background: #DC4E00; color: #fff; padding: 16px 28px; font-size: 14px; line-height: 1.6; }
+        .action-banner strong { display: block; font-size: 16px; margin-bottom: 6px; }
+        .action-banner a { color: #fff; }
+        .footer { background: #f5f5f5; padding: 14px 28px; font-size: 11px; color: #999; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="header">
+          <h1>🛠️ Rental Enquiry — Manual Quote Required</h1>
+          <p>${store.name} · Melbourne Metro Hire · Submitted ${submittedAt} (AEST)</p>
+        </div>
+
+        <div class="alert-banner">
+          ⚠️ This is a rental/hire enquiry, not a paid order. No payment has been taken.
+          The customer has been sent an acknowledgement only — pricing and availability must be confirmed manually.
+        </div>
+
+        <div class="section">
+          <div class="section-title">Item Enquired</div>
+          <table class="detail">
+            <tr><td style="color:#555;width:170px;">Product</td><td>${product?.title || '—'}</td></tr>
+            <tr><td style="color:#555;">SKU</td><td>${product?.sku || '—'}</td></tr>
+            <tr><td style="color:#555;">Price (list)</td><td>${product?.price || '—'}</td></tr>
+            <tr><td style="color:#555;">Product Link</td><td>${product?.url ? `<a href="${product.url}">${product.url}</a>` : '—'}</td></tr>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Person Placing Order</div>
+          <table class="detail">
+            <tr><td style="color:#555;width:170px;">Role</td><td>${formData.orderer_role || '—'}</td></tr>
+            <tr><td style="color:#555;">Name</td><td>${formData.orderer_name || '—'}</td></tr>
+            <tr><td style="color:#555;">Email</td><td>${formData.email || '—'}</td></tr>
+            <tr><td style="color:#555;">Phone</td><td>${formData.phone || '—'}</td></tr>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Shipping Address</div>
+          <table class="detail">
+            <tr><td style="color:#555;width:170px;">Company</td><td>${formData.company_name || '—'}</td></tr>
+            <tr><td style="color:#555;">Address</td><td>${formData.address_line1 || '—'} ${formData.address_line2 || ''}</td></tr>
+            <tr><td style="color:#555;">City / Postcode</td><td>${formData.city || '—'} ${formData.postcode || ''}</td></tr>
+            <tr><td style="color:#555;">Suburb / Area</td><td>${formData.suburb_area || '—'}</td></tr>
+            <tr><td style="color:#555;">Shipping Phone</td><td>${formData.shipping_phone || formData.phone || '—'}</td></tr>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Delivery</div>
+          <table class="detail">
+            <tr><td style="color:#555;width:170px;">Time Frame</td><td>${formData.delivery_timeframe || '—'}</td></tr>
+          </table>
+        </div>
+
+        ${hasNdis ? `
+        <div class="section">
+          <div class="section-title">Participant Info (NDIS)</div>
+          <table class="detail">
+            <tr><td style="color:#555;width:170px;">Name</td><td>${formData.participant_first_name || ''} ${formData.participant_last_name || ''}</td></tr>
+            <tr><td style="color:#555;">D.O.B</td><td>${formData.participant_dob || '—'}</td></tr>
+            <tr><td style="color:#555;">NDIS Number</td><td>${formData.participant_ndis_number || '—'}</td></tr>
+            <tr><td style="color:#555;">Email</td><td>${formData.participant_email || '—'}</td></tr>
+          </table>
+        </div>
+        ` : ''}
+
+        ${formData.notes ? `
+        <div style="padding:0 28px;">
+          <div class="section-title" style="margin-top:16px;">Order Notes</div>
+          <div class="notes-box">${formData.notes}</div>
+        </div>
+        ` : ''}
+
+        <div class="action-banner">
+          <strong>✅ Next Steps</strong>
+          1. Confirm stock/availability and hire pricing for this item.<br>
+          2. Contact the customer at <strong>${formData.email}</strong> / <strong>${formData.phone || '—'}</strong> with a quote.<br>
+          3. Once agreed, update the draft order in Shopify with the correct pricing and hire terms.
+          ${shopAdminOrderUrl ? `<br>4. <a href="${shopAdminOrderUrl}">Open the draft order in Shopify →</a>` : '<br>4. Note: draft order creation failed — check logs and create manually if needed.'}
+        </div>
+
+        <div class="footer">
+          Internal use only — ${store.name} · ABN ${store.abn} · ${store.email}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * sendRentalEnquiryNotification — Rental path only.
+ * Notifies the internal team with full enquiry + draft order details.
+ * Uses the dedicated rental team inbox if set, otherwise falls back to the
+ * general contact/internal address used for bulky-item notifications.
+ */
+async function sendRentalEnquiryNotification({ formData, product, draftOrder }) {
+  const transporter = createTransporter();
+  const store        = storeMeta();
+  const internalTo   = process.env.RENTAL_TEAM_EMAIL || 'contact@agedcareandmedical.com.au';
+  const customerName = formData.orderer_name || 'Customer';
+
+  const mailOptions = {
+    from:    `"${store.name} Rentals" <${store.from}>`,
+    to:      internalTo,
+    subject: `🛠️ RENTAL ENQUIRY — ${product?.title || 'Item'} from ${customerName}`,
+    html:    buildRentalNotificationHtml({ formData, product, draftOrder }),
+  };
+
+  if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalTo) {
+    mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
+  }
+
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[email] Rental enquiry notification sent: ${info.messageId} → ${internalTo}`);
+  return info;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. RENTAL PATH — Customer acknowledgement (no PDF, no pricing)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildRentalAcknowledgementHtml({ formData, product }) {
+  const store = storeMeta();
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 15px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
+        .wrap { max-width: 560px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+        .header { background: #DC4E00; color: #fff; padding: 28px 32px; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p  { margin: 6px 0 0; font-size: 14px; opacity: .75; }
+        .body { padding: 28px 32px; }
+        .body p { line-height: 1.6; margin: 0 0 14px; }
+        .highlight { background: #f9f9f9; border-left: 3px solid #DC4E00; padding: 12px 16px; border-radius: 4px; margin: 20px 0; font-size: 14px; }
+        .highlight strong { display: block; margin-bottom: 4px; font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: .5px; }
+        .contact-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 6px; }
+        .contact-row a { color: #DC4E00; text-decoration: none; font-weight: 600; }
+        .footer { background: #f5f5f5; padding: 18px 32px; font-size: 12px; color: #888; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="header">
+          <h1>We've Received Your Rental Enquiry</h1>
+          <p>${store.name} · Melbourne Metro Hire</p>
+        </div>
+        <div class="body">
+          <p>Dear ${formData.orderer_name || 'Customer'},</p>
+
+          <p>
+            Thank you for your enquiry about <strong>${product?.title || 'this item'}</strong>.
+            Our team will confirm availability and hire pricing before your order is finalised.
+          </p>
+
+          <div class="highlight">
+            <strong>Item Enquired</strong>
+            ${product?.title || '—'}
+          </div>
+
+          <div class="highlight">
+            <strong>Requested Time Frame</strong>
+            ${formData.delivery_timeframe || '—'}
+          </div>
+
+          <p>We'll be in touch at <strong>${formData.email}</strong>${formData.phone ? ` or <strong>${formData.phone}</strong>` : ''} shortly with a quote.</p>
+          <p>If you have any questions in the meantime, please don't hesitate to get in touch:</p>
+          <div class="contact-row">
+            <a href="mailto:${store.email}">✉️ ${store.email}</a>
+            <a href="tel:${store.phone}">📞 ${store.phone}</a>
+          </div>
+
+          <p style="margin-top:20px;">Kind regards,<br><strong>${store.name} Team</strong></p>
+        </div>
+        <div class="footer">
+          This is an automated email. Please do not reply directly to this message.<br>
+          ABN: ${store.abn}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * sendRentalAcknowledgement — Rental path only.
+ * Lets the customer know their enquiry was received; no pricing/PDF included.
+ */
+async function sendRentalAcknowledgement({ formData, product }) {
+  const customerEmail = formData.email;
+  if (!customerEmail) {
+    throw new Error('Cannot send rental acknowledgement — email is missing from formData.');
+  }
+
+  const transporter = createTransporter();
+  const store        = storeMeta();
+
+  const mailOptions = {
+    from:    `"${store.name}" <${store.from}>`,
+    to:      customerEmail,
+    subject: `Your Rental Enquiry — ${product?.title || 'Item'} · ${store.name}`,
+    html:    buildRentalAcknowledgementHtml({ formData, product }),
+  };
+
+  if (process.env.INTERNAL_BCC_EMAIL) {
+    mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
+  }
+
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[email] Rental acknowledgement sent: ${info.messageId} → ${customerEmail}`);
+  return info;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+module.exports = {
+  sendInvoice,
+  sendQuoteRequest,
+  sendQuoteAcknowledgement,
+  sendInternalInvoiceNotification,
+  sendRentalEnquiryNotification,
+  sendRentalAcknowledgement,
+};
