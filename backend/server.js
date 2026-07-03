@@ -9,7 +9,8 @@
  * and registers all API routes.
  *
  * FLOW:
- * Shopify Frontend → /api/submit-order → services → Shopify + PDF + Email
+ * Shopify Frontend → /api/submit-order   → services → Shopify + PDF + Email
+ * Shopify Frontend → /api/rental-enquiry → services → Shopify + Email
  *
  * -----------------------------------------
  * 🔧 WHAT YOU EDIT HERE
@@ -32,14 +33,15 @@
  * DO NOT TOUCH
  * -----------------------------------------
  * - express.json middleware (required for API body parsing)
- * - route registration: app.use('/api', orderRoute)
+ * - route registration: app.use('/api', orderRoute) / app.use('/api', rentalRoute)
  */
 require('dotenv').config();
-const express    = require('express');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const rateLimit  = require('express-rate-limit');
-const orderRoute = require('./routes/submit-order');
+const express     = require('express');
+const cors        = require('cors');
+const helmet      = require('helmet');
+const rateLimit   = require('express-rate-limit');
+const orderRoute  = require('./routes/submit-order');
+const rentalRoute = require('./routes/rental-enquiry');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -81,6 +83,7 @@ app.use(express.json({ limit: '2mb' }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', orderRoute);
+app.use('/api', rentalRoute);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
