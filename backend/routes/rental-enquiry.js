@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const router  = express.Router();
-const { sendRentalEnquiryNotification, sendRentalAcknowledgement } = require('../services/email');
+const { sendRentalEnquiryNotification } = require('../services/email');
 
 // ─── ENV VARIABLES ────────────────────────────────────────────────────────────
 const SHOPIFY_SHOP_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
@@ -95,6 +95,12 @@ async function createRentalDraftOrder({ product, formData }) {
 }
 
 // ─── MAIN ROUTE HANDLER ───────────────────────────────────────────────────────
+// NOTE: This route intentionally sends ONE email only — the internal team
+// notification (sendRentalEnquiryNotification), which goes to
+// RENTAL_TEAM_EMAIL if set, otherwise falls back to
+// contact@agedcareandmedical.com.au (see services/email.js). No email is
+// sent to the customer for rental enquiries; the on-screen success message
+// in rental-enquiry-modal.liquid is the only confirmation they receive.
 async function handleRentalEnquiry(req, res) {
   try {
     const { product, formData } = req.body;
@@ -126,15 +132,7 @@ async function handleRentalEnquiry(req, res) {
       console.error('[rental-enquiry] ❌ Team notification FAILED:', emailErr.message);
     }
 
-    // Step 3: Send the customer an acknowledgement (no pricing, no PDF)
-    try {
-      await sendRentalAcknowledgement({ formData, product });
-      console.log(`[rental-enquiry] ✅ Acknowledgement sent to ${formData.email}`);
-    } catch (emailErr) {
-      console.error('[rental-enquiry] ❌ Acknowledgement FAILED:', emailErr.message);
-    }
-
-    // Step 4: Respond
+    // Step 3: Respond
     return res.json({
       success:          true,
       draft_order_id:   draftOrder?.id   || null,
