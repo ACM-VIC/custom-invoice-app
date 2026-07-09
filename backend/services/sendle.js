@@ -53,6 +53,17 @@ const SENDLE_BASE_URL = process.env.SENDLE_ENV === 'sandbox'
 const WAREHOUSE_SUBURB   = process.env.WAREHOUSE_SUBURB   || 'Diggers Rest';
 const WAREHOUSE_POSTCODE = process.env.WAREHOUSE_POSTCODE || '3337';
 
+// ── Fallback flat rate (used ONLY when Sendle is unreachable due to a
+// DNS/network problem on their end — confirmed 2026-07-09 to be an issue
+// with api.sendle.com's A record via Heroku/NS1, not this backend or Azure).
+// This keeps checkout working during a Sendle outage instead of hard-failing
+// every quote request. Set SENDLE_FALLBACK_FLAT_RATE in Azure App Settings
+// to override the default. Set SENDLE_FALLBACK_ENABLED=false to disable this
+// and go back to hard-failing instead (e.g. if you'd rather not quote a
+// possibly-inaccurate flat rate).
+const FALLBACK_ENABLED   = process.env.SENDLE_FALLBACK_ENABLED !== 'false';
+const FALLBACK_FLAT_RATE = parseFloat(process.env.SENDLE_FALLBACK_FLAT_RATE || '15.00');
+
 // ─── STARTUP GUARD ────────────────────────────────────────────────────────
 if (!SENDLE_API_ID || !SENDLE_API_KEY) {
   console.error(
@@ -209,6 +220,22 @@ async function getSendleQuote({ weightKg, dimensionsCm, deliverySuburb, delivery
       '| cause:', networkErr.cause ? String(networkErr.cause) : '(no cause)',
       '| code:', networkErr.cause?.code || '(none)'
     );
+
+    if (FALLBACK_ENABLED) {
+      console.warn(
+        `[sendle] Returning fallback flat-rate estimate ($${FALLBACK_FLAT_RATE.toFixed(2)}) ` +
+        `for ${deliverySuburb} ${deliveryPostcode} because Sendle is unreachable (network_error). ` +
+        'This does NOT reflect a real Sendle quote — check status.sendle.com if this persists.'
+      );
+      return {
+        success:        true,
+        price:          FALLBACK_FLAT_RATE.toFixed(2),
+        priceDisplay:   `$${FALLBACK_FLAT_RATE.toFixed(2)}`,
+        planName:       'Estimated (live rates temporarily unavailable)',
+        isFallbackRate: true,
+      };
+    }
+
     return { success: false, reason: 'network_error' };
   }
 
