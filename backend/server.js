@@ -37,6 +37,15 @@
  * - route registration: app.use('/api', orderRoute) / app.use('/api', rentalEnquiryRoute) / app.use('/api', shippingQuoteRoute)
  */
 require('dotenv').config();
+
+// ── Force IPv4 DNS resolution ─────────────────────────────────────────────
+// Node's built-in fetch (undici) can prefer IPv6 first. On Azure App Service
+// this sometimes has no working IPv6 route, causing every outbound fetch()
+// to fail with a generic "fetch failed" error (the real cause is hidden in
+// error.cause). This forces IPv4 first, which resolves that class of issue.
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
 const express            = require('express');
 const cors               = require('cors');
 const helmet             = require('helmet');

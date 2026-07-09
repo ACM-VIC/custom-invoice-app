@@ -100,7 +100,14 @@ async function getSendleQuote({ weightKg, dimensionsCm, deliverySuburb, delivery
       },
     });
   } catch (networkErr) {
-    console.error('[sendle] Network error calling Sendle:', networkErr.message);
+    // Node's fetch (undici) hides the real reason behind `.cause` — the
+    // top-level message is always the unhelpful generic "fetch failed".
+    console.error(
+      '[sendle] Network error calling Sendle:',
+      networkErr.message,
+      '| cause:', networkErr.cause ? String(networkErr.cause) : '(no cause)',
+      '| code:', networkErr.cause?.code || '(none)'
+    );
     return { success: false, reason: 'network_error' };
   }
 
