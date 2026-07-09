@@ -11,6 +11,7 @@
  * FLOW:
  * Shopify Frontend → /api/submit-order → services → Shopify + PDF + Email
  * Shopify Frontend → /api/rental-enquiry → services → Shopify + PDF + Email
+ * Shopify Frontend → /api/shipping-quote → services → Sendle
  *
  * -----------------------------------------
  * 🔧 WHAT YOU EDIT HERE
@@ -33,7 +34,7 @@
  * DO NOT TOUCH
  * -----------------------------------------
  * - express.json middleware (required for API body parsing)
- * - route registration: app.use('/api', orderRoute) / app.use('/api', rentalEnquiryRoute)
+ * - route registration: app.use('/api', orderRoute) / app.use('/api', rentalEnquiryRoute) / app.use('/api', shippingQuoteRoute)
  */
 require('dotenv').config();
 const express            = require('express');
@@ -42,6 +43,7 @@ const helmet             = require('helmet');
 const rateLimit          = require('express-rate-limit');
 const orderRoute         = require('./routes/submit-order');
 const rentalEnquiryRoute = require('./routes/rental-enquiry');
+const shippingQuoteRoute = require('./routes/shipping-quote');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -84,6 +86,7 @@ app.use(express.json({ limit: '2mb' }));
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api', orderRoute);
 app.use('/api', rentalEnquiryRoute);
+app.use('/api', shippingQuoteRoute);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
