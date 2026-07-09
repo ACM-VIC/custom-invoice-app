@@ -15,9 +15,28 @@
  *   checkout-modal.js. Set WAREHOUSE_SUBURB to the exact suburb name Sendle
  *   recognises for that postcode (suburb + postcode must match on Sendle's
  *   side or the quote request will fail).
+ *
+ * DNS WORKAROUND (added 2026-07-09):
+ *   Azure App Service Linux's container DNS forwarder (127.0.0.11) has been
+ *   observed failing to fully resolve api.sendle.com — it resolves the first
+ *   CNAME hop (api.sendle.com → api.sendle.com.herokudns.com) but never
+ *   returns a final A record, causing Node's fetch() to throw ENOTFOUND.
+ *   This was confirmed independently of Sendle's API via `nslookup` and
+ *   `curl` directly in the App Service SSH console.
+ *
+ *   Fix: route DNS lookups for outbound Sendle requests through a direct
+ *   resolver (Cloudflare/Google) instead of the container's default
+ *   resolver, via a custom undici Agent `lookup` function. The system
+ *   resolver is kept as a fallback in case the public resolvers are ever
+ *   blocked by network policy.
+ *
+ *   Requires the `undici` package: npm install undici
  */
 
 'use strict';
+
+const dns = require('dns');
+const { Agent } = require('undici');
 
 const SENDLE_API_ID  = process.env.SENDLE_API_ID;
 const SENDLE_API_KEY = process.env.SENDLE_API_KEY;
@@ -46,6 +65,46 @@ function authHeader() {
   const token = Buffer.from(`${SENDLE_API_ID}:${SENDLE_API_KEY}`).toString('base64');
   return `Basic ${token}`;
 }
+
+// ─── CUSTOM DNS RESOLVER (Azure container DNS workaround) ─────────────────
+// Use a direct resolver instead of the container's default (127.0.0.11),
+// which has been observed failing to resolve api.sendle.com's CNAME chain.
+const directResolver = new dns.Resolver();
+directResolver.setServers([
+  '1.1.1.1',  // Cloudflare
+  '8.8.8.8',  // Google
+]);
+
+/**
+ * Custom `lookup` function for undici's Agent. Tries the direct resolver
+ * first; falls back to the system resolver (dns.lookup) if that fails, so
+ * this degrades gracefully if 1.1.1.1/8.8.8.8 are ever blocked by network
+ * policy (e.g. future VNet/NSG changes).
+ */
+function resolveViaDirectDns(hostname, options, callback) {
+  directResolver.resolve4(hostname, (err, addresses) => {
+    if (!err && addresses && addresses.length > 0) {
+      const family = 4;
+      if (options && options.all) {
+        return callback(null, addresses.map((address) => ({ address, family })));
+      }
+      return callback(null, addresses[0], family);
+    }
+
+    console.error(
+      `[sendle] Direct DNS resolution failed for ${hostname}, falling back to system resolver:`,
+      err ? err.message : 'no addresses returned'
+    );
+    // Fall back to whatever the system resolver can do.
+    dns.lookup(hostname, options, callback);
+  });
+}
+
+const sendleDnsAgent = new Agent({
+  connect: {
+    lookup: resolveViaDirectDns,
+  },
+});
 
 /**
  * Requests a live quote from Sendle for a single parcel.
@@ -98,6 +157,9 @@ async function getSendleQuote({ weightKg, dimensionsCm, deliverySuburb, delivery
         // Sendle asks integrations to identify themselves via User-Agent.
         'User-Agent':    'Aged Care & Medical (https://agedcareandmedical.com.au)',
       },
+      // Route this request's connection through our custom DNS resolver
+      // instead of the container's default, broken one.
+      dispatcher: sendleDnsAgent,
     });
   } catch (networkErr) {
     // Node's fetch (undici) hides the real reason behind `.cause` — the
