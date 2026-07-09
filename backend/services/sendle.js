@@ -101,6 +101,10 @@ async function resolveViaDoH(hostname) {
       const data = await res.json();
       const answer = (data.Answer || []).find((a) => a.type === 1); // type 1 = A record
       if (!answer || !answer.data) {
+        // Log the full raw response so we can see exactly what came back
+        // (e.g. a CNAME-only answer with no A record, an NXDOMAIN Status
+        // code, etc.) rather than just knowing it failed.
+        console.error(`[sendle] Raw DoH response for ${hostname}:`, JSON.stringify(data));
         throw new Error('DoH response had no A record');
       }
       return answer.data;
