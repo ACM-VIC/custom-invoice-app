@@ -66,38 +66,73 @@ function authHeader() {
   return `Basic ${token}`;
 }
 
-// ─── CUSTOM DNS RESOLVER (Azure container DNS workaround) ─────────────────
-// Use a direct resolver instead of the container's default (127.0.0.11),
-// which has been observed failing to resolve api.sendle.com's CNAME chain.
-const directResolver = new dns.Resolver();
-directResolver.setServers([
-  '1.1.1.1',  // Cloudflare
-  '8.8.8.8',  // Google
-]);
+// ─── CUSTOM DNS RESOLVER — DNS-over-HTTPS (Azure port-53 interception workaround) ──
+// Azure App Service Linux's sandbox network layer has been observed
+// transparently redirecting ALL outbound port 53 (DNS) traffic to its own
+// internal resolver, regardless of which server IP is specified in code —
+// which is why pointing dns.Resolver directly at 1.1.1.1/8.8.8.8 still
+// returned empty results instead of a real connection error.
+//
+// Workaround: resolve DNS over HTTPS (port 443) instead of raw UDP/TCP 53.
+// This is a normal HTTPS request and isn't subject to the same interception.
+// Cloudflare's DoH endpoint is tried first, Google's as a second attempt,
+// and the system resolver (dns.lookup) is the final fallback so this
+// degrades gracefully rather than hard-failing if DoH is ever unreachable.
+
+const DOH_ENDPOINTS = [
+  (hostname) => `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=A`,
+  (hostname) => `https://dns.google/resolve?name=${encodeURIComponent(hostname)}&type=A`,
+];
+
+async function resolveViaDoH(hostname) {
+  let lastErr;
+  for (const buildUrl of DOH_ENDPOINTS) {
+    try {
+      // Deliberately uses the plain global fetch (default dispatcher, system
+      // DNS) — these DoH endpoint hostnames are simple, single A-record
+      // domains that resolve fine through Azure's forwarder; only the
+      // multi-hop CNAME chain on api.sendle.com's side has been problematic.
+      const res = await fetch(buildUrl(hostname), {
+        headers: { accept: 'application/dns-json' },
+      });
+      if (!res.ok) {
+        throw new Error(`DoH endpoint returned HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const answer = (data.Answer || []).find((a) => a.type === 1); // type 1 = A record
+      if (!answer || !answer.data) {
+        throw new Error('DoH response had no A record');
+      }
+      return answer.data;
+    } catch (err) {
+      lastErr = err;
+      console.error(`[sendle] DoH lookup via ${buildUrl(hostname)} failed:`, err.message);
+    }
+  }
+  throw lastErr || new Error('All DoH endpoints failed');
+}
 
 /**
- * Custom `lookup` function for undici's Agent. Tries the direct resolver
+ * Custom `lookup` function for undici's Agent. Resolves via DNS-over-HTTPS
  * first; falls back to the system resolver (dns.lookup) if that fails, so
- * this degrades gracefully if 1.1.1.1/8.8.8.8 are ever blocked by network
- * policy (e.g. future VNet/NSG changes).
+ * this degrades gracefully rather than hard-failing.
  */
 function resolveViaDirectDns(hostname, options, callback) {
-  directResolver.resolve4(hostname, (err, addresses) => {
-    if (!err && addresses && addresses.length > 0) {
+  resolveViaDoH(hostname)
+    .then((address) => {
       const family = 4;
       if (options && options.all) {
-        return callback(null, addresses.map((address) => ({ address, family })));
+        return callback(null, [{ address, family }]);
       }
-      return callback(null, addresses[0], family);
-    }
-
-    console.error(
-      `[sendle] Direct DNS resolution failed for ${hostname}, falling back to system resolver:`,
-      err ? err.message : 'no addresses returned'
-    );
-    // Fall back to whatever the system resolver can do.
-    dns.lookup(hostname, options, callback);
-  });
+      return callback(null, address, family);
+    })
+    .catch((err) => {
+      console.error(
+        `[sendle] DoH resolution failed for ${hostname}, falling back to system resolver:`,
+        err.message
+      );
+      dns.lookup(hostname, options, callback);
+    });
 }
 
 const sendleDnsAgent = new Agent({
