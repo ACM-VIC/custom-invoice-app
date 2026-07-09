@@ -789,11 +789,16 @@ function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) 
  * attached when available, but this is never sent to the customer.
  * Uses the dedicated rental team inbox if set, otherwise falls back to the
  * general contact/internal address used for bulky-item notifications.
+ *
+ * A copy is always CC'd to no-reply@agedcareandmedical.com.au as well
+ * (deduplicated against the primary "to" address, in case RENTAL_TEAM_EMAIL
+ * is ever set to that same address).
  */
 async function sendRentalEnquiryNotification({ formData, product, draftOrder, pdfBuffer }) {
   const transporter = createTransporter();
   const store        = storeMeta();
   const internalTo   = process.env.RENTAL_TEAM_EMAIL || 'contact@agedcareandmedical.com.au';
+  const copyTo       = 'no-reply@agedcareandmedical.com.au';
   const customerName = formData.orderer_name || 'Customer';
 
   const mailOptions = {
@@ -810,18 +815,25 @@ async function sendRentalEnquiryNotification({ formData, product, draftOrder, pd
       : [],
   };
 
-  if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalTo) {
+  if (copyTo !== internalTo) {
+    mailOptions.cc = copyTo;
+  }
+
+  if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalTo && process.env.INTERNAL_BCC_EMAIL !== copyTo) {
     mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
   }
 
   const info = await transporter.sendMail(mailOptions);
-  console.log(`[email] Rental enquiry notification sent: ${info.messageId} → ${internalTo}`);
+  console.log(`[email] Rental enquiry notification sent: ${info.messageId} → ${internalTo}${mailOptions.cc ? ` (cc: ${mailOptions.cc})` : ''}`);
   return info;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. RENTAL PATH — Customer acknowledgement (no PDF, no pricing)
 // ─────────────────────────────────────────────────────────────────────────────
+// NOTE: sendRentalAcknowledgement is kept here for reference / possible future
+// use, but as of the current rental-enquiry.js route, it is NOT called —
+// rental enquiries only trigger sendRentalEnquiryNotification above.
 
 function buildRentalAcknowledgementHtml({ formData, product }) {
   const store = storeMeta();
@@ -892,6 +904,7 @@ function buildRentalAcknowledgementHtml({ formData, product }) {
 /**
  * sendRentalAcknowledgement — Rental path only.
  * Lets the customer know their enquiry was received; no pricing/PDF included.
+ * NOT currently called by routes/rental-enquiry.js — kept for possible future use.
  */
 async function sendRentalAcknowledgement({ formData, product }) {
   const customerEmail = formData.email;
