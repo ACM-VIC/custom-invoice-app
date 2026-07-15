@@ -58,7 +58,7 @@ const AUSPOST_ACCOUNT_NUMBER = process.env.AUSPOST_ACCOUNT_NUMBER;
 
 // Your dispatch / warehouse postcode — parcels are quoted FROM here.
 // Mirrors WAREHOUSE_POSTCODE used previously in services/sendle.js.
-const WAREHOUSE_POSTCODE = process.env.WAREHOUSE_POSTCODE || '3337';
+const WAREHOUSE_POSTCODE = process.env.WAREHOUSE_POSTCODE || '3196';
 
 // Set AUSPOST_API_TEST_MODE=true in env to hit AusPost's sandbox path
 // instead of production while you're validating the integration.
