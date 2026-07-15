@@ -114,6 +114,7 @@ function extractNumericPrice(priceEntry) {
   if (!priceEntry || typeof priceEntry !== 'object') return null;
 
   const candidates = [
+    priceEntry.calculated_price, // confirmed real AusPost field (2026-07-15 log)
     priceEntry.price,
     priceEntry.total_cost,
     priceEntry.total_price,
@@ -147,7 +148,9 @@ function extractCheapestPrice(prices) {
     if (best === null || num < best.priceDollars) {
       best = {
         priceDollars: num,
-        serviceName: p.product_name || p.product_id || 'AusPost eParcel',
+        // Real AusPost responses (confirmed 2026-07-15) carry product_type
+        // (e.g. "PARCEL POST + SIGNATURE") and product_id, not product_name.
+        serviceName: p.product_type || p.product_id || 'AusPost eParcel',
       };
     }
   }
