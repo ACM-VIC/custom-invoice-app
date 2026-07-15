@@ -37,11 +37,15 @@ async function handleShippingQuote(req, res) {
       return res.json({ success: false });
     }
 
+    const rawCost    = parseFloat(quote.price);
+    const finalPrice = rawCost * 1.12;
+
     return res.json({
       success:      true,
-      price:        quote.price,
-      priceDisplay: quote.priceDisplay,
+      price:        finalPrice.toFixed(2),
+      priceDisplay: `$${finalPrice.toFixed(2)}`,
     });
+
   } catch (err) {
     console.error('[shipping-quote] Unhandled error:', err);
     return res.status(500).json({ success: false, message: 'Internal server error.' });
