@@ -210,20 +210,19 @@ function buildBulkyNotificationHtml({ formType, formData, draftOrder, shipping }
     <body>
       <div class="wrap">
         <div class="header">
-          <h1>🚛 Manual Quotation Required</h1>
+          <h1> Manual Quotation Required</h1>
           <p>${store.name} · ${billingType} Order · Submitted ${submittedAt} (AEST)</p>
         </div>
 
         <div class="alert-banner">
-          ⚠️ This order contains a BULKY / FREIGHT item and is NOT following the standard invoice workflow.
-          The customer has NOT been emailed an invoice. A manual freight quote must be arranged before contacting them.
+          Quote Required
+          This order requires a manual quote. Please complete the quote before contacting the customer or proceeding with the order.
         </div>
 
         <div class="body">
           <p>
-            A Draft Order has already been created in Shopify for reference, and the standard PDF invoice
-            is attached for the team's convenience — but it must <strong>not</strong> be sent to the customer
-            as-is, since the shipping cost shown does not reflect the actual freight required.
+            A Draft Order has been created in Shopify for reference. A PDF invoice attachment is not yet available.Please prepare a manual quote before contacting the customer,
+            as the shipping cost shown is not the final freight charge.
           </p>
 
           <div class="highlight">
@@ -285,7 +284,7 @@ async function sendInternalInvoiceNotification({ formType, formData, draftOrder,
   const mailOptions = {
     from:    `"${store.name} Orders" <${store.from}>`,
     to:      internalTo,
-    subject: `🚛 MANUAL QUOTE REQUIRED — ${billingType} Order ${draftOrder?.name || ''} from ${customerName}`,
+    subject: `MANUAL QUOTE REQUIRED — ${billingType} Order ${draftOrder?.name || ''} from ${customerName}`,
     html:    buildBulkyNotificationHtml({ formType, formData, draftOrder, shipping }),
     attachments: pdfBuffer
       ? [{
