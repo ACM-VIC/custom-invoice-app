@@ -702,7 +702,7 @@ function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) 
     </head>
     <body>
       <div class="wrap">
-        <div class="-rental-header">
+        <div class="rental-header">
           <h1>🛠️ Rental Enquiry — Manual Quote Required</h1>
           <p>${store.name} · Melbourne Metro Hire · Submitted ${submittedAt} (AEST)</p>
         </div>
