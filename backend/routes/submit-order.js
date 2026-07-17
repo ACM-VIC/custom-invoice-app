@@ -8,13 +8,6 @@ const SHOPIFY_SHOP_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
 const SHOPIFY_ACCESS_TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
 
-// ─── TEMP TOGGLE ──────────────────────────────────────────────────────────────
-// Set to true to re-enable PDF generation + email sending.
-// While false: Shopify draft orders are still created as normal, but no PDF
-// is generated and no email (customer invoice OR internal bulky notification)
-// is sent. Flip this back to true (or delete the guard below) once ready.
-const ENABLE_PDF_AND_EMAIL = false;
-
 // ─── STARTUP GUARD ────────────────────────────────────────────────────────────
 if (!SHOPIFY_SHOP_DOMAIN) {
   console.error(
@@ -28,12 +21,11 @@ if (!SHOPIFY_ACCESS_TOKEN) {
     'Set it in Azure Portal → App Service → Configuration.'
   );
 }
-if (!ENABLE_PDF_AND_EMAIL) {
-  console.warn(
-    '[submit-order] ⚠️  PDF generation and email sending are TEMPORARILY DISABLED ' +
-    '(ENABLE_PDF_AND_EMAIL = false in routes/submit-order.js). Draft orders will still be created.'
-  );
-}
+console.warn(
+  '[submit-order] ⚠️  PDF generation is TEMPORARILY DISABLED and all emails ' +
+  '(customer + bulky) are TEMPORARILY routed to internal notification only, no PDF attached. ' +
+  'See the commented-out Steps 3 & 4 in handleSubmitOrder to restore normal behaviour.'
+);
 // ─────────────────────────────────────────────────────────────────────────────
 // SHIPPING HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,35 +259,40 @@ async function handleSubmitOrder(req, res) {
 
     let pdfBuffer = null;
 
-    if (ENABLE_PDF_AND_EMAIL) {
-      // Step 3: Generate PDF
-      try {
-        pdfBuffer = await generateInvoice({ formType, formData, draftOrder });
-        console.log(`[submit-order] ✅ PDF generated (${pdfBuffer.length} bytes)`);
-      } catch (pdfErr) {
-        console.error('[submit-order] ❌ PDF generation FAILED:', pdfErr.message);
-      }
-      // ── Step 4: Send email ──────────────────────────────────────────────────
-      // Standard (S/M/L) orders: customer receives the invoice email (unchanged).
-      // Bulky/Freight orders: customer receives NO email; instead the internal
-      // team gets the invoice + PDF for manual review.
-      if (hasBulkyItem) {
-        try {
-          await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer, shipping });
-          console.log('[submit-order] ✅ Internal bulky-item notification sent to contact@agedcareandmedical.com.au');
-        } catch (emailErr) {
-          console.error('[submit-order] ❌ Internal bulky-item notification FAILED:', emailErr.message);
-        }
-      } else {
-        try {
-          await sendInvoice({ formType, formData, draftOrder, pdfBuffer });
-          console.log(`[submit-order] ✅ Invoice email sent to ${formData.submitter_email}`);
-        } catch (emailErr) {
-          console.error('[submit-order] ❌ Invoice email FAILED:', emailErr.message);
-        }
-      }
-    } else {
-      console.log('[submit-order] ⏭️  PDF generation and email sending skipped (ENABLE_PDF_AND_EMAIL = false).');
+    // ── Step 3: Generate PDF — TEMPORARILY DISABLED ────────────────────────────
+    // try {
+    //   pdfBuffer = await generateInvoice({ formType, formData, draftOrder });
+    //   console.log(`[submit-order] ✅ PDF generated (${pdfBuffer.length} bytes)`);
+    // } catch (pdfErr) {
+    //   console.error('[submit-order] ❌ PDF generation FAILED:', pdfErr.message);
+    // }
+
+    // ── Step 4: Send email — TEMPORARILY internal-only, no PDF, no customer email ──
+    // Normal branching (customer invoice for standard orders, internal notice
+    // for bulky orders) is disabled below. Every order — bulky or not — now
+    // sends ONLY the internal notification, with no PDF attached.
+    //
+    // if (hasBulkyItem) {
+    //   try {
+    //     await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer, shipping });
+    //     console.log('[submit-order] ✅ Internal bulky-item notification sent to contact@agedcareandmedical.com.au');
+    //   } catch (emailErr) {
+    //     console.error('[submit-order] ❌ Internal bulky-item notification FAILED:', emailErr.message);
+    //   }
+    // } else {
+    //   try {
+    //     await sendInvoice({ formType, formData, draftOrder, pdfBuffer });
+    //     console.log(`[submit-order] ✅ Invoice email sent to ${formData.submitter_email}`);
+    //   } catch (emailErr) {
+    //     console.error('[submit-order] ❌ Invoice email FAILED:', emailErr.message);
+    //   }
+    // }
+
+    try {
+      await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer, shipping });
+      console.log('[submit-order] ✅ Internal notification sent to contact@agedcareandmedical.com.au (no PDF, no customer email — TEMP).');
+    } catch (emailErr) {
+      console.error('[submit-order] ❌ Internal notification FAILED:', emailErr.message);
     }
 
     // Step 5: Respond
