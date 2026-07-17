@@ -688,7 +688,7 @@ function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) 
         .rental-header { background: #20DC00; color: #fff; padding: 24px 28px; }
         .header h1 { margin: 0; font-size: 19px; font-weight: 700; }
         .header p  { margin: 6px 0 0; font-size: 13px; opacity: .8; }
-        .rental-alert-banner { background: #20DC00; color: #fff; padding: 12px 28px; font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+        .rental-alert-banner { background: #23af0b; color: #fff; padding: 12px 28px; font-size: 13px; font-weight: 700; letter-spacing: .3px; }
         .section { padding: 20px 28px 0; }
         .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #DC4E00; border-bottom: 2px solid #f2e0d8; padding-bottom: 6px; margin-bottom: 12px; }
         table.detail { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
