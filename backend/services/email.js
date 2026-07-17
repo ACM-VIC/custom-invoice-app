@@ -103,8 +103,14 @@ function buildInvoiceEmailHtml({ formType, formData, draftOrder }) {
           </div>
           `}
 
-          <p>Please review the attached PDF invoice and forward it to your ${formType === 'ndis' ? 'plan manager or support coordinator' : 'aged care coordinator'} for payment processing.</p>
-          <p>If you have any questions, please don't hesitate to contact us at <a href="mailto:${store.email}">${store.email}</a>.</p>
+          <p>Thank you for your request. Our team will review it and send you a confirmation shortly.</p>
+          <p>Once your request has been confirmed, please forward the attached PDF invoice to your
+          ${formType === 'ndis' ? 'plan manager or support coordinator' : 'aged care coordinator'}
+          for payment processing.</p>
+          <p>
+            If you have any questions, please don't hesitate to contact us at
+            <a href="mailto:${store.email}">${store.email}</a>.
+          </p>
           <p>Kind regards,<br><strong>${store.name} Team</strong></p>
         </div>
         <div class="footer">
