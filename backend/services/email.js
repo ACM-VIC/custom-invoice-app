@@ -808,7 +808,7 @@ async function sendRentalEnquiryNotification({ formData, product, draftOrder, pd
   const transporter = createTransporter();
   const store        = storeMeta();
   const internalTo   = process.env.RENTAL_TEAM_EMAIL || 'contact@agedcareandmedical.com.au';
-  const copyTo       = 'no-reply@agedcareandmedical.com.au';
+  const copyTo       = 'no-reply@agedcareandmedical.com.au' || 'contact@agedcareandmedical.com.au';
   const customerName = formData.orderer_name || 'Customer';
 
   const mailOptions = {
