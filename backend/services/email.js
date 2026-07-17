@@ -210,19 +210,19 @@ function buildBulkyNotificationHtml({ formType, formData, draftOrder, shipping }
     <body>
       <div class="wrap">
         <div class="header">
-          <h1> Manual Quotation Required</h1>
+          <h1>🚛 New Order Notification</h1>
           <p>${store.name} · ${billingType} Order · Submitted ${submittedAt} (AEST)</p>
         </div>
 
         <div class="alert-banner">
-          Quote Required
-          This order requires a manual quote. Please complete the quote before contacting the customer or proceeding with the order.
+          ⚠️ This order is being routed to the team for review. The customer has NOT been emailed an invoice
+          — please follow up directly before proceeding.
         </div>
 
         <div class="body">
           <p>
-            A Draft Order has been created in Shopify for reference. A PDF invoice attachment is not yet available.Please prepare a manual quote before contacting the customer,
-            as the shipping cost shown is not the final freight charge.
+            A Draft Order has already been created in Shopify for reference. Please review the order details
+            below and follow up with the customer as needed.
           </p>
 
           <div class="highlight">
@@ -284,7 +284,7 @@ async function sendInternalInvoiceNotification({ formType, formData, draftOrder,
   const mailOptions = {
     from:    `"${store.name} Orders" <${store.from}>`,
     to:      internalTo,
-    subject: `MANUAL QUOTE REQUIRED — ${billingType} Order ${draftOrder?.name || ''} from ${customerName}`,
+    subject: `🚛 New ${billingType} Order — ${draftOrder?.name || ''} from ${customerName}`,
     html:    buildBulkyNotificationHtml({ formType, formData, draftOrder, shipping }),
     attachments: pdfBuffer
       ? [{
@@ -807,7 +807,7 @@ async function sendRentalEnquiryNotification({ formData, product, draftOrder, pd
   const transporter = createTransporter();
   const store        = storeMeta();
   const internalTo   = process.env.RENTAL_TEAM_EMAIL || 'contact@agedcareandmedical.com.au';
-  const copyTo       = 'no-reply@agedcareandmedical.com.au' || 'contact@agedcareandmedical.com.au';
+  const copyTo       = 'no-reply@agedcareandmedical.com.au';
   const customerName = formData.orderer_name || 'Customer';
 
   const mailOptions = {
