@@ -7,6 +7,14 @@ const { sendInvoice, sendQuoteRequest, sendQuoteAcknowledgement, sendInternalInv
 const SHOPIFY_SHOP_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
 const SHOPIFY_ACCESS_TOKEN   = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOPIFY_VERSION = process.env.SHOPIFY_API_VERSION || '2024-01';
+
+// ─── TEMP TOGGLE ──────────────────────────────────────────────────────────────
+// Set to true to re-enable PDF generation + email sending.
+// While false: Shopify draft orders are still created as normal, but no PDF
+// is generated and no email (customer invoice OR internal bulky notification)
+// is sent. Flip this back to true (or delete the guard below) once ready.
+const ENABLE_PDF_AND_EMAIL = false;
+
 // ─── STARTUP GUARD ────────────────────────────────────────────────────────────
 if (!SHOPIFY_SHOP_DOMAIN) {
   console.error(
@@ -18,6 +26,12 @@ if (!SHOPIFY_ACCESS_TOKEN) {
   console.error(
     '[submit-order] ⚠️  SHOPIFY_ACCESS_TOKEN is not set. ' +
     'Set it in Azure Portal → App Service → Configuration.'
+  );
+}
+if (!ENABLE_PDF_AND_EMAIL) {
+  console.warn(
+    '[submit-order] ⚠️  PDF generation and email sending are TEMPORARILY DISABLED ' +
+    '(ENABLE_PDF_AND_EMAIL = false in routes/submit-order.js). Draft orders will still be created.'
   );
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -242,6 +256,7 @@ async function handleSubmitOrder(req, res) {
     // ── Step 2: Create Shopify Draft Order ─────────────────────────────────────
     // Draft order is created for BOTH standard and bulky/freight orders, so the
     // bulky order is visible in Shopify awaiting manual review.
+    // NOTE: this step ALWAYS runs, regardless of ENABLE_PDF_AND_EMAIL.
     let draftOrder = null;
     try {
       draftOrder = await createShopifyDraftOrder({ formType, formData, cart: safeCart, shipping });
@@ -249,33 +264,40 @@ async function handleSubmitOrder(req, res) {
     } catch (shopifyErr) {
       console.error('[submit-order] ❌ Shopify draft order FAILED:', shopifyErr.message);
     }
-    // Step 3: Generate PDF
+
     let pdfBuffer = null;
-    try {
-      pdfBuffer = await generateInvoice({ formType, formData, draftOrder });
-      console.log(`[submit-order] ✅ PDF generated (${pdfBuffer.length} bytes)`);
-    } catch (pdfErr) {
-      console.error('[submit-order] ❌ PDF generation FAILED:', pdfErr.message);
-    }
-    // ── Step 4: Send email ──────────────────────────────────────────────────────
-    // Standard (S/M/L) orders: customer receives the invoice email (unchanged).
-    // Bulky/Freight orders: customer receives NO email; instead the internal
-    // team gets the invoice + PDF for manual review.
-    if (hasBulkyItem) {
+
+    if (ENABLE_PDF_AND_EMAIL) {
+      // Step 3: Generate PDF
       try {
-        await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer, shipping });
-        console.log('[submit-order] ✅ Internal bulky-item notification sent to contact@agedcareandmedical.com.au');
-      } catch (emailErr) {
-        console.error('[submit-order] ❌ Internal bulky-item notification FAILED:', emailErr.message);
+        pdfBuffer = await generateInvoice({ formType, formData, draftOrder });
+        console.log(`[submit-order] ✅ PDF generated (${pdfBuffer.length} bytes)`);
+      } catch (pdfErr) {
+        console.error('[submit-order] ❌ PDF generation FAILED:', pdfErr.message);
+      }
+      // ── Step 4: Send email ──────────────────────────────────────────────────
+      // Standard (S/M/L) orders: customer receives the invoice email (unchanged).
+      // Bulky/Freight orders: customer receives NO email; instead the internal
+      // team gets the invoice + PDF for manual review.
+      if (hasBulkyItem) {
+        try {
+          await sendInternalInvoiceNotification({ formType, formData, draftOrder, pdfBuffer, shipping });
+          console.log('[submit-order] ✅ Internal bulky-item notification sent to contact@agedcareandmedical.com.au');
+        } catch (emailErr) {
+          console.error('[submit-order] ❌ Internal bulky-item notification FAILED:', emailErr.message);
+        }
+      } else {
+        try {
+          await sendInvoice({ formType, formData, draftOrder, pdfBuffer });
+          console.log(`[submit-order] ✅ Invoice email sent to ${formData.submitter_email}`);
+        } catch (emailErr) {
+          console.error('[submit-order] ❌ Invoice email FAILED:', emailErr.message);
+        }
       }
     } else {
-      try {
-        await sendInvoice({ formType, formData, draftOrder, pdfBuffer });
-        console.log(`[submit-order] ✅ Invoice email sent to ${formData.submitter_email}`);
-      } catch (emailErr) {
-        console.error('[submit-order] ❌ Invoice email FAILED:', emailErr.message);
-      }
+      console.log('[submit-order] ⏭️  PDF generation and email sending skipped (ENABLE_PDF_AND_EMAIL = false).');
     }
+
     // Step 5: Respond
     return res.json({
       success:          true,
