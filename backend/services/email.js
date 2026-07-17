@@ -685,16 +685,16 @@ function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) 
       <style>
         body { font-family: Arial, sans-serif; font-size: 14px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
         .wrap { max-width: 620px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
-        .header { background: #DC4E00; color: #fff; padding: 24px 28px; }
+        .rental-header { background: #20DC00; color: #fff; padding: 24px 28px; }
         .header h1 { margin: 0; font-size: 19px; font-weight: 700; }
         .header p  { margin: 6px 0 0; font-size: 13px; opacity: .8; }
-        .alert-banner { background: #B83E00; color: #fff; padding: 12px 28px; font-size: 13px; font-weight: 700; letter-spacing: .3px; }
+        .rental-alert-banner { background: #20DC00; color: #fff; padding: 12px 28px; font-size: 13px; font-weight: 700; letter-spacing: .3px; }
         .section { padding: 20px 28px 0; }
         .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #DC4E00; border-bottom: 2px solid #f2e0d8; padding-bottom: 6px; margin-bottom: 12px; }
         table.detail { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
         table.detail td { font-size: 13px; vertical-align: top; padding: 4px 0; }
         .notes-box { margin: 0 28px 20px; background: #f9f9f9; border-left: 3px solid #ccc; border-radius: 4px; padding: 10px 14px; font-size: 13px; color: #555; }
-        .action-banner { background: #DC4E00; color: #fff; padding: 16px 28px; font-size: 14px; line-height: 1.6; }
+        .rental-action-banner { background: #20DC00; color: #fff; padding: 16px 28px; font-size: 14px; line-height: 1.6; }
         .action-banner strong { display: block; font-size: 16px; margin-bottom: 6px; }
         .action-banner a { color: #fff; }
         .footer { background: #f5f5f5; padding: 14px 28px; font-size: 11px; color: #999; text-align: center; }
@@ -702,13 +702,13 @@ function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) 
     </head>
     <body>
       <div class="wrap">
-        <div class="header">
+        <div class="-rental-header">
           <h1>🛠️ Rental Enquiry — Manual Quote Required</h1>
           <p>${store.name} · Melbourne Metro Hire · Submitted ${submittedAt} (AEST)</p>
         </div>
 
-        <div class="alert-banner">
-          ⚠️ This is a rental/hire enquiry, not a paid order. No payment has been taken.
+        <div class="rental-alert-banner">
+          This is a rental/hire enquiry, not a paid order. No payment has been taken.
           The customer has been sent an acknowledgement only — pricing and availability must be confirmed manually.
         </div>
 
@@ -769,13 +769,17 @@ function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) 
         </div>
         ` : ''}
 
-        <div class="action-banner">
-          <strong>✅ Next Steps</strong>
-          1. Confirm stock/availability and hire pricing for this item.<br>
-          2. Contact the customer at <strong>${formData.email}</strong> / <strong>${formData.phone || '—'}</strong> with a quote.<br>
-          3. Once agreed, update the draft order in Shopify with the correct pricing and hire terms.
-          ${shopAdminOrderUrl ? `<br>4. <a href="${shopAdminOrderUrl}">Open the draft order in Shopify →</a>` : '<br>4. Note: draft order creation failed — check logs and create manually if needed.'}
-          ${hasPdf ? '<br>5. A reference PDF (using the item\'s current list price, not a confirmed quote) is attached below.' : ''}
+        <div class="rental-action-banner">
+          <strong>Next Steps</strong><br>
+          1. Confirm the item's availability, rental period, and hire pricing.<br>
+          2. Contact the customer at <strong>${formData.email}</strong>${formData.phone ? ` or <strong>${formData.phone}</strong>` : ''} to discuss the quote and rental details.<br>
+          3. Once the customer accepts the quote, update the Shopify draft order with the agreed pricing, rental terms, and any applicable charges.<br>
+          ${shopAdminOrderUrl
+            ? `4. <a href="${shopAdminOrderUrl}">Open the draft order in Shopify →</a>`
+            : '4. Draft order creation was unsuccessful. Please review the logs and create the draft order manually if required.'}
+          ${hasPdf
+            ? '<br>5. A reference PDF is attached for review. The pricing shown reflects the current list price only and is not a confirmed rental quote.'
+            : ''}
         </div>
 
         <div class="footer">
