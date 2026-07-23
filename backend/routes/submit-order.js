@@ -47,6 +47,96 @@ function extractShippingLine(formData) {
     drivingItem:     formData.shipping_driving_item     || '',
   };
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// DISCOUNT CODE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Looks up a customer-entered discount code against Shopify and resolves it
+ * to the underlying price rule's value/type, so it can be applied to the
+ * draft order as an `applied_discount`.
+ *
+ * Returns null if no code was entered. Otherwise always resolves (never
+ * throws) to an object describing whether the code is usable:
+ *   { code, valid: true,  value_type: 'percentage'|'fixed_amount', value, title }
+ *   { code, valid: false, reason: '<human readable reason>' }
+ */
+async function lookupDiscountCode(rawCode) {
+  const code = (rawCode || '').trim();
+  if (!code) return null;
+
+  if (!SHOPIFY_SHOP_DOMAIN || !SHOPIFY_ACCESS_TOKEN) {
+    console.error('[submit-order] Discount lookup skipped — Shopify env vars not configured.');
+    return { code, valid: false, reason: 'Store not configured for discount lookup' };
+  }
+
+  try {
+    // Step 1: resolve the discount code → price_rule_id
+    const lookupUrl = `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_VERSION}/discount_codes/lookup.json?code=${encodeURIComponent(code)}`;
+    const lookupRes = await fetch(lookupUrl, {
+      headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN },
+    });
+
+    if (lookupRes.status === 404) {
+      return { code, valid: false, reason: 'Discount code not found' };
+    }
+    if (!lookupRes.ok) {
+      const errBody = await lookupRes.text().catch(() => '');
+      console.error(`[submit-order] Discount lookup failed (${lookupRes.status}): ${errBody}`);
+      return { code, valid: false, reason: `Lookup failed (${lookupRes.status})` };
+    }
+
+    const lookupJson   = await lookupRes.json();
+    const discountCode = lookupJson.discount_code;
+    if (!discountCode || !discountCode.price_rule_id) {
+      return { code, valid: false, reason: 'Discount code not found' };
+    }
+
+    // Step 2: fetch the price rule to get the value/type
+    const priceRuleUrl = `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_VERSION}/price_rules/${discountCode.price_rule_id}.json`;
+    const priceRuleRes = await fetch(priceRuleUrl, {
+      headers: { 'X-Shopify-Access-Token': SHOPIFY_ACCESS_TOKEN },
+    });
+
+    if (!priceRuleRes.ok) {
+      const errBody = await priceRuleRes.text().catch(() => '');
+      console.error(`[submit-order] Price rule fetch failed (${priceRuleRes.status}): ${errBody}`);
+      return { code, valid: false, reason: 'Could not load discount details' };
+    }
+
+    const priceRuleJson = await priceRuleRes.json();
+    const priceRule     = priceRuleJson.price_rule;
+    if (!priceRule) {
+      return { code, valid: false, reason: 'Could not load discount details' };
+    }
+
+    // Skip codes that are expired or not yet active — treat as not usable.
+    const now = new Date();
+    if (priceRule.starts_at && new Date(priceRule.starts_at) > now) {
+      return { code, valid: false, reason: 'Discount code is not active yet' };
+    }
+    if (priceRule.ends_at && new Date(priceRule.ends_at) < now) {
+      return { code, valid: false, reason: 'Discount code has expired' };
+    }
+    if (priceRule.usage_limit != null && typeof discountCode.usage_count === 'number'
+        && discountCode.usage_count >= priceRule.usage_limit) {
+      return { code, valid: false, reason: 'Discount code has reached its usage limit' };
+    }
+
+    // price_rule.value is a negative string, e.g. "-10.0" (10% or $10 off)
+    const numericValue = Math.abs(parseFloat(priceRule.value || '0'));
+
+    return {
+      code,
+      valid: true,
+      value_type: priceRule.value_type === 'percentage' ? 'percentage' : 'fixed_amount',
+      value: numericValue,
+      title: priceRule.title || code,
+    };
+  } catch (err) {
+    console.error('[submit-order] Discount code lookup error:', err.message);
+    return { code, valid: false, reason: 'Lookup error' };
+  }
+}
 // ─── SHOPIFY HELPERS ──────────────────────────────────────────────────────────
 function buildShopifyShippingLine(shipping) {
   if (!shipping || shipping.price === null) return null;
@@ -54,6 +144,20 @@ function buildShopifyShippingLine(shipping) {
     ? '0.00'
     : Number(shipping.price).toFixed(2);
   return { title: shipping.title || 'Delivery', price: priceValue, custom: true };
+}
+/**
+ * Builds the draft order's top-level `applied_discount` object from a
+ * resolved lookupDiscountCode() result. Returns null if there's nothing
+ * valid to apply (no code entered, or the code failed validation).
+ */
+function buildShopifyAppliedDiscount(discount) {
+  if (!discount || !discount.valid) return null;
+  return {
+    description: `Discount code: ${discount.code}`,
+    value_type:  discount.value_type,
+    value:       discount.value.toString(),
+    title:       discount.title,
+  };
 }
 function buildLineItems(cartItems) {
   if (!cartItems?.length) return [];
@@ -78,7 +182,7 @@ function buildShippingAddress(formData) {
     phone:      formData.delivery_phone || formData.submitter_phone || '',
   };
 }
-function buildNoteAttributes(formType, formData, shipping) {
+function buildNoteAttributes(formType, formData, shipping, discount) {
   const priceNote = shipping.isQuote
     ? 'Manual Quote Required'
     : (shipping.price !== null ? `$${Number(shipping.price).toFixed(2)}` : 'TBC');
@@ -98,6 +202,17 @@ function buildNoteAttributes(formType, formData, shipping) {
   ];
   if (shipping.overrideNotes) {
     attrs.push({ name: 'Freight Notes', value: shipping.overrideNotes });
+  }
+  if (discount) {
+    attrs.push({ name: 'Discount Code', value: discount.code });
+    attrs.push({
+      name: 'Discount Applied',
+      value: discount.valid
+        ? (discount.value_type === 'percentage'
+            ? `${discount.value}% off (${discount.title})`
+            : `$${Number(discount.value).toFixed(2)} off (${discount.title})`)
+        : `Not applied — ${discount.reason}`,
+    });
   }
   if (formType === 'ndis') {
     attrs.push(
@@ -124,16 +239,17 @@ function buildNoteAttributes(formType, formData, shipping) {
   }
   return attrs.filter(a => a.value && a.value.trim() !== '');
 }
-async function createShopifyDraftOrder({ formType, formData, cart, shipping }) {
+async function createShopifyDraftOrder({ formType, formData, cart, shipping, discount }) {
   if (!SHOPIFY_SHOP_DOMAIN || !SHOPIFY_ACCESS_TOKEN) {
     throw new Error(
       'Shopify env vars not configured — set SHOPIFY_SHOP_DOMAIN and SHOPIFY_ACCESS_TOKEN.'
     );
   }
-  const lineItems       = buildLineItems(cart.items);
-  const shippingAddress = buildShippingAddress(formData);
-  const noteAttributes  = buildNoteAttributes(formType, formData, shipping);
-  const shopifyShipping = buildShopifyShippingLine(shipping);
+  const lineItems        = buildLineItems(cart.items);
+  const shippingAddress  = buildShippingAddress(formData);
+  const noteAttributes   = buildNoteAttributes(formType, formData, shipping, discount);
+  const shopifyShipping  = buildShopifyShippingLine(shipping);
+  const appliedDiscount  = buildShopifyAppliedDiscount(discount);
   const draftOrderPayload = {
     draft_order: {
       line_items:       lineItems,
@@ -148,8 +264,11 @@ async function createShopifyDraftOrder({ formType, formData, cart, shipping }) {
         formData.ndis_funding_type || formData.ac_funding_type || '',
         'Modal Order',
         shipping.isQuote ? 'Freight Quote Needed' : '',
+        discount && discount.valid ? 'Discount Applied' : '',
+        discount && !discount.valid ? 'Discount Code Invalid' : '',
       ].filter(Boolean).join(', '),
       ...(shopifyShipping && { shipping_line: shopifyShipping }),
+      ...(appliedDiscount && { applied_discount: appliedDiscount }),
     },
   };
   const url = `https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_VERSION}/draft_orders.json`;
@@ -197,12 +316,30 @@ function buildPdfShippingRow(shipping) {
     note: `${shipping.categoryLabel} · ${shipping.zoneLabel}`,
   };
 }
-function buildPdfTotals(cart, shipping) {
+function buildPdfDiscountRow(discount) {
+  if (!discount || !discount.valid) return null;
+  const display = discount.value_type === 'percentage'
+    ? `-${discount.value}%`
+    : `-$${Number(discount.value).toFixed(2)}`;
+  return {
+    sku: '', description: `Discount — ${discount.title} (${discount.code})`,
+    display, is_discount: true,
+  };
+}
+function buildPdfTotals(cart, shipping, discount) {
   const subtotalCents  = cart.total_price || 0;
   const subtotalDollar = subtotalCents / 100;
   const shippingDollar = (shipping && !shipping.isQuote && shipping.price !== null)
     ? Number(shipping.price) : 0;
-  const grandTotal = subtotalDollar + shippingDollar;
+
+  let discountDollar = 0;
+  if (discount && discount.valid) {
+    discountDollar = discount.value_type === 'percentage'
+      ? subtotalDollar * (discount.value / 100)
+      : Math.min(discount.value, subtotalDollar);
+  }
+
+  const grandTotal = Math.max(0, subtotalDollar - discountDollar + shippingDollar);
   let shippingDisplay;
   if (!shipping || shipping.price === null)  shippingDisplay = 'TBC';
   else if (shipping.isQuote)                 shippingDisplay = 'Manual Quote — To Be Confirmed';
@@ -210,6 +347,8 @@ function buildPdfTotals(cart, shipping) {
   return {
     subtotal_cents:      subtotalCents,
     subtotal_display:    `$${subtotalDollar.toFixed(2)}`,
+    discount_applied:    discount && discount.valid ? discount.code : null,
+    discount_display:    (discount && discount.valid) ? `-$${discountDollar.toFixed(2)}` : null,
     shipping_price:      shippingDollar,
     shipping_display:    shippingDisplay,
     shipping_title:      shipping?.title        || 'Delivery',
@@ -217,7 +356,7 @@ function buildPdfTotals(cart, shipping) {
     shipping_zone:       shipping?.zoneLabel     || '',
     grand_total_cents:   Math.round(grandTotal * 100),
     grand_total_display: shipping?.isQuote
-      ? `$${subtotalDollar.toFixed(2)} + freight TBC`
+      ? `$${(subtotalDollar - discountDollar).toFixed(2)} + freight TBC`
       : `$${grandTotal.toFixed(2)}`,
   };
 }
@@ -235,6 +374,16 @@ async function handleSubmitOrder(req, res) {
       category: shipping.categoryLabel, zone: shipping.zoneLabel,
       price: shipping.priceDisplay, isQuote: shipping.isQuote, title: shipping.title,
     });
+
+    // ── Step 1b: Resolve discount code (if the customer entered one) ───────────
+    const discount = await lookupDiscountCode(formData.discount_code);
+    if (discount) {
+      console.log('[submit-order] Discount code extracted:', {
+        code: discount.code, valid: discount.valid,
+        reason: discount.reason, value_type: discount.value_type, value: discount.value,
+      });
+    }
+
     // ── BULKY / FREIGHT FLAG ───────────────────────────────────────────────────
     // shipping.isQuote is true whenever the winning shipping category is
     // 'bulky'. Because category ranking always promotes the highest-ranked
@@ -247,11 +396,13 @@ async function handleSubmitOrder(req, res) {
     }
     // ── Step 2: Create Shopify Draft Order ─────────────────────────────────────
     // Draft order is created for BOTH standard and bulky/freight orders, so the
-    // bulky order is visible in Shopify awaiting manual review.
-    // NOTE: this step ALWAYS runs, regardless of ENABLE_PDF_AND_EMAIL.
+    // bulky order is visible in Shopify awaiting manual review. If a discount
+    // code was entered and resolves to a valid, active price rule, it's applied
+    // to the draft order as applied_discount — otherwise the draft order still
+    // goes through and a note attribute records that the code wasn't applied.
     let draftOrder = null;
     try {
-      draftOrder = await createShopifyDraftOrder({ formType, formData, cart: safeCart, shipping });
+      draftOrder = await createShopifyDraftOrder({ formType, formData, cart: safeCart, shipping, discount });
       console.log(`[submit-order] Shopify draft order created: ${draftOrder.name} (${draftOrder.id})`);
     } catch (shopifyErr) {
       console.error('[submit-order] ❌ Shopify draft order FAILED:', shopifyErr.message);
@@ -308,6 +459,11 @@ async function handleSubmitOrder(req, res) {
         price:    shipping.price,
         display:  shipping.priceDisplay,
       },
+      discount_applied: discount ? {
+        code:  discount.code,
+        valid: discount.valid,
+        reason: discount.valid ? null : discount.reason,
+      } : null,
     });
   } catch (err) {
     console.error('[submit-order] Unhandled error:', err);
