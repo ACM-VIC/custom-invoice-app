@@ -3,6 +3,7 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "handlebars": "^4.7.9",
+    "multer": "^2.2.0",
     "puppeteer": "^24.41.0"
   }
 }

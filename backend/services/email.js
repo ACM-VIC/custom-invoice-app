@@ -3,9 +3,13 @@
  * Sends invoice emails via Microsoft Outlook / Office 365 SMTP.
  *
  * Exports:
- *   sendInvoice()              — Normal path: customer invoice + PDF attachment
- *   sendQuoteRequest()         — Quote path:  internal team email with full order details
- *   sendQuoteAcknowledgement() — Quote path:  customer acknowledgement (no PDF)
+ *   sendInvoice()                      — Normal path: customer invoice + PDF attachment
+ *   sendQuoteRequest()                 — Quote path:  internal team email with full order details
+ *   sendQuoteAcknowledgement()         — Quote path:  customer acknowledgement (no PDF)
+ *   sendInternalInvoiceNotification()  — Bulky/Freight path: internal-only notification
+ *   sendRentalEnquiryNotification()    — Rental path: internal-only notification
+ *   sendRentalAcknowledgement()        — Rental path: customer acknowledgement (unused currently)
+ *   sendHomeModsEnquiryNotification()  — Home Modifications form: internal-only notification
  */
 
 const nodemailer = require('nodemailer');
@@ -941,6 +945,142 @@ async function sendRentalAcknowledgement({ formData, product }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 6. HOME MODIFICATIONS PATH — Internal team notification (from
+//    sections/home-modifications-form.liquid)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildHomeModsNotificationHtml({ formData, hasAttachment }) {
+  const store       = storeMeta();
+  const submittedAt = new Date().toLocaleString('en-AU', {
+    timeZone: 'Australia/Melbourne',
+    day: '2-digit', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  const fullName = [formData.first_name, formData.last_name].filter(Boolean).join(' ') || '—';
+
+  const assessmentLabels = {
+    'home-modifications': 'Home Modifications',
+    'occupational-therapy': 'Occupational Therapy Assessment',
+    'equipment-hire': 'Equipment Hire / Rental',
+    'other': 'Other Inquiry',
+  };
+  const fundingLabels = {
+    'ndis': 'NDIS',
+    'aged-care': 'Aged Care Package',
+    'private': 'Private / Self-Funded',
+    'other': 'Other',
+  };
+
+  const assessmentLabel = assessmentLabels[formData.assessment_type] || formData.assessment_type || '—';
+  const fundingLabel     = fundingLabels[formData.funding_source] || formData.funding_source || '—';
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 14px; color: #222; margin: 0; padding: 0; background: #f5f5f5; }
+        .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+        .header { background: #d95300; color: #fff; padding: 24px 28px; }
+        .header h1 { margin: 0; font-size: 19px; font-weight: 700; }
+        .header p  { margin: 6px 0 0; font-size: 13px; opacity: .85; }
+        .section { padding: 20px 28px 0; }
+        .section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #d95300; border-bottom: 2px solid #f2e0d8; padding-bottom: 6px; margin-bottom: 12px; }
+        table.detail { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+        table.detail td { font-size: 13px; vertical-align: top; padding: 4px 0; }
+        .notes-box { margin: 0 28px 20px; background: #f9f9f9; border-left: 3px solid #ccc; border-radius: 4px; padding: 10px 14px; font-size: 13px; color: #555; }
+        .action-banner { background: #d95300; color: #fff; padding: 16px 28px; font-size: 14px; line-height: 1.6; }
+        .action-banner strong { display: block; font-size: 16px; margin-bottom: 6px; }
+        .footer { background: #f5f5f5; padding: 14px 28px; font-size: 11px; color: #999; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="header">
+          <h1>🏠 New Home Modifications Enquiry</h1>
+          <p>${store.name} · Submitted ${submittedAt} (AEST)</p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Contact Details</div>
+          <table class="detail">
+            <tr><td style="color:#555;width:170px;">Name</td><td>${fullName}</td></tr>
+            <tr><td style="color:#555;">Email</td><td>${formData.email || '—'}</td></tr>
+            <tr><td style="color:#555;">Phone</td><td>${formData.phone || '—'}</td></tr>
+            <tr><td style="color:#555;">Client Name (if on behalf of)</td><td>${formData.client_name || '—'}</td></tr>
+          </table>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Work &amp; Assessment Details</div>
+          <table class="detail">
+            <tr><td style="color:#555;width:170px;">Assessment Requested</td><td>${assessmentLabel}</td></tr>
+            <tr><td style="color:#555;">Funding Source</td><td>${fundingLabel}</td></tr>
+          </table>
+        </div>
+
+        ${formData.description ? `
+        <div style="padding:0 28px;">
+          <div class="section-title" style="margin-top:16px;">Description of Work</div>
+          <div class="notes-box">${formData.description}</div>
+        </div>
+        ` : ''}
+
+        <div class="action-banner">
+          <strong>✅ Next Steps</strong>
+          1. Contact ${fullName !== '—' ? fullName : 'the enquirer'} at <strong>${formData.email}</strong>${formData.phone ? ` / <strong>${formData.phone}</strong>` : ''}.<br>
+          2. Confirm the assessment type and funding source before scheduling.
+          ${hasAttachment ? '<br>3. A supporting document was attached to this email for review.' : ''}
+        </div>
+
+        <div class="footer">
+          Internal use only — ${store.name} · ABN ${store.abn} · ${store.email}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * sendHomeModsEnquiryNotification — Home Modifications form only.
+ * Internal-only notification — no customer-facing email is sent for this
+ * form. Attaches the customer's uploaded document if one was provided.
+ * Uses HOME_MODS_TEAM_EMAIL if set, otherwise falls back to the same
+ * general inbox used for bulky-item and rental notifications.
+ */
+async function sendHomeModsEnquiryNotification({ formData, attachment }) {
+  const transporter  = createTransporter();
+  const store        = storeMeta();
+  const internalTo   = process.env.HOME_MODS_TEAM_EMAIL || 'contact@agedcareandmedical.com.au';
+  const fullName     = [formData.first_name, formData.last_name].filter(Boolean).join(' ') || 'Customer';
+
+  const mailOptions = {
+    from:    `"${store.name} Home Mods" <${store.from}>`,
+    to:      internalTo,
+    subject: `🏠 Home Modifications Enquiry — ${fullName}`,
+    html:    buildHomeModsNotificationHtml({ formData, hasAttachment: !!attachment }),
+    attachments: attachment
+      ? [{
+          filename:    attachment.filename,
+          content:     attachment.content,
+          contentType: attachment.contentType,
+        }]
+      : [],
+  };
+
+  if (process.env.INTERNAL_BCC_EMAIL && process.env.INTERNAL_BCC_EMAIL !== internalTo) {
+    mailOptions.bcc = process.env.INTERNAL_BCC_EMAIL;
+  }
+
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[email] Home Modifications enquiry notification sent: ${info.messageId} → ${internalTo}`);
+  return info;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 module.exports = {
   sendInvoice,
   sendQuoteRequest,
@@ -948,4 +1088,5 @@ module.exports = {
   sendInternalInvoiceNotification,
   sendRentalEnquiryNotification,
   sendRentalAcknowledgement,
+  sendHomeModsEnquiryNotification,
 };
