@@ -13,6 +13,8 @@
  * Shopify Frontend → /api/rental-enquiry → services → Shopify + PDF + Email
  * Shopify Frontend → /api/shipping-quote → services → Sendle
  * Shopify Frontend → /api/home-modifications-enquiry → services → Email
+ *   (TEMP DISABLED — see note below, routes/home-modifications.js is
+ *    missing from deploy and was crashing the whole app on startup)
  *
  * -----------------------------------------
  * 🔧 WHAT YOU EDIT HERE
@@ -54,7 +56,12 @@ const rateLimit             = require('express-rate-limit');
 const orderRoute             = require('./routes/submit-order');
 const rentalEnquiryRoute     = require('./routes/rental-enquiry');
 const shippingQuoteRoute     = require('./routes/shipping-quote');
-const homeModificationsRoute = require('./routes/home-modifications');
+// TEMP: commented out — routes/home-modifications.js was missing from the
+// last deploy, causing require() to throw and crash the ENTIRE app on
+// startup (every route, including rental-enquiry, was down as a result).
+// Re-enable this line once routes/home-modifications.js is confirmed
+// present in the deployed wwwroot.
+// const homeModificationsRoute = require('./routes/home-modifications');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -98,7 +105,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api', orderRoute);
 app.use('/api', rentalEnquiryRoute);
 app.use('/api', shippingQuoteRoute);
-app.use('/api', homeModificationsRoute);
+// app.use('/api', homeModificationsRoute); // TEMP: see note above
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
