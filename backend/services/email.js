@@ -721,7 +721,7 @@ function buildRentalNotificationHtml({ formData, product, draftOrder, hasPdf }) 
             <tr><td style="color:#555;width:170px;">Product</td><td>${product?.title || '—'}</td></tr>
             <tr><td style="color:#555;">SKU</td><td>${product?.sku || '—'}</td></tr>
             <tr><td style="color:#555;">Price (list)</td><td>${product?.price || '—'}</td></tr>
-            <tr><td style="color:#555;">Product Link</td><td>${product?.url ? `<a href="${product.url}">${product.url}</a>` : '—'}</td></tr>
+            <tr><td style="color:#555;">Product Link</td><td>${product?.url ? `<a href="${resolveProductUrl(product.url)}" target="_blank" rel="noopener" style="color:#20DC00;font-weight:600;text-decoration:none;">View Product →</a>` : '—'}</td></tr>
           </table>
         </div>
 
