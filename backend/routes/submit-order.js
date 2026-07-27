@@ -471,3 +471,5 @@ async function handleSubmitOrder(req, res) {
   }
 }
 // ─── ROUTER ───────────────────────────────────────────────────────────────────
+router.post('/submit-order', handleSubmitOrder);
+module.exports = router;
