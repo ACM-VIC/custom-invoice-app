@@ -13,8 +13,7 @@
  * Shopify Frontend → /api/rental-enquiry → services → Shopify + PDF + Email
  * Shopify Frontend → /api/shipping-quote → services → Sendle
  * Shopify Frontend → /api/home-modifications-enquiry → services → Email
- *   (TEMP DISABLED — see note below, routes/home-modifications.js is
- *    missing from deploy and was crashing the whole app on startup)
+ * Shopify Frontend → /api/home-mod-assessment-enquiry → services → Email
  *
  * -----------------------------------------
  * 🔧 WHAT YOU EDIT HERE
@@ -37,7 +36,19 @@
  * DO NOT TOUCH
  * -----------------------------------------
  * - express.json middleware (required for API body parsing)
- * - route registration: app.use('/api', orderRoute) / app.use('/api', rentalEnquiryRoute) / app.use('/api', shippingQuoteRoute) / app.use('/api', homeModificationsRoute)
+ * - route registration: app.use('/api', orderRoute) / app.use('/api', rentalEnquiryRoute) / app.use('/api', shippingQuoteRoute) / app.use('/api', homeModificationsRoute) / app.use('/api', homeModAssessmentRoute)
+ *
+ * -----------------------------------------
+ * ⚠️ DEPLOY CHECKLIST BEFORE PUSHING THIS FILE
+ * -----------------------------------------
+ * A missing route file previously crashed the ENTIRE app on startup (every
+ * route went down, not just the missing one), because a top-level require()
+ * throws synchronously before app.listen() ever runs. Before deploying this
+ * version, confirm BOTH of these files exist and are committed:
+ *   - routes/home-modifications.js
+ *   - routes/home-mod-assessment.js
+ * If either is missing, either add it or comment out its require + app.use
+ * pair (both lines) rather than deploying with a dangling require().
  */
 require('dotenv').config();
 
@@ -56,12 +67,8 @@ const rateLimit             = require('express-rate-limit');
 const orderRoute             = require('./routes/submit-order');
 const rentalEnquiryRoute     = require('./routes/rental-enquiry');
 const shippingQuoteRoute     = require('./routes/shipping-quote');
-// TEMP: commented out — routes/home-modifications.js was missing from the
-// last deploy, causing require() to throw and crash the ENTIRE app on
-// startup (every route, including rental-enquiry, was down as a result).
-// Re-enable this line once routes/home-modifications.js is confirmed
-// present in the deployed wwwroot.
-// const homeModificationsRoute = require('./routes/home-modifications');
+const homeModificationsRoute = require('./routes/home-modifications');
+const homeModAssessmentRoute = require('./routes/home-mod-assessment');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -105,7 +112,8 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api', orderRoute);
 app.use('/api', rentalEnquiryRoute);
 app.use('/api', shippingQuoteRoute);
-// app.use('/api', homeModificationsRoute); // TEMP: see note above
+app.use('/api', homeModificationsRoute);
+app.use('/api', homeModAssessmentRoute);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
