@@ -8,6 +8,12 @@ const SHOPIFY_SHOP_DOMAIN  = process.env.SHOPIFY_SHOP_DOMAIN;
 const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 const SHOPIFY_VERSION      = process.env.SHOPIFY_API_VERSION || '2024-01';
 
+console.warn(
+  '[rental-enquiry] ⚠️  Draft order creation is TEMPORARILY DISABLED — rental ' +
+  'enquiries now send an internal notification email only. See the commented-out ' +
+  'Step 1 in handleRentalEnquiry to restore normal behaviour.'
+);
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function buildNoteAttributes(formData) {
   const labels = {
@@ -107,37 +113,33 @@ async function handleRentalEnquiry(req, res) {
     if (!product || !formData) {
       return res.status(400).json({ success: false, message: 'Missing product or formData.' });
     }
-    if (!product.variantId) {
-      return res.status(400).json({ success: false, message: 'Missing product.variantId.' });
-    }
     if (!formData.email) {
       return res.status(400).json({ success: false, message: 'Missing formData.email.' });
     }
 
-    // Step 1: Create Shopify Draft Order
-    let draftOrder = null;
-    try {
-      draftOrder = await createRentalDraftOrder({ product, formData });
-      console.log(`[rental-enquiry] ✅ Draft order created: ${draftOrder.name} (${draftOrder.id})`);
-    } catch (shopifyErr) {
-      console.error('[rental-enquiry] ❌ Draft order FAILED:', shopifyErr.message);
-    }
+    // ── Step 1: Create Shopify Draft Order — TEMPORARILY DISABLED ──────────────
+    // let draftOrder = null;
+    // try {
+    //   if (!product.variantId) {
+    //     throw new Error('Missing product.variantId.');
+    //   }
+    //   draftOrder = await createRentalDraftOrder({ product, formData });
+    //   console.log(`[rental-enquiry] ✅ Draft order created: ${draftOrder.name} (${draftOrder.id})`);
+    // } catch (shopifyErr) {
+    //   console.error('[rental-enquiry] ❌ Draft order FAILED:', shopifyErr.message);
+    // }
 
-    // Step 2: Notify the internal team — proceeds even if draft order failed,
-    // so the team still finds out and can create it manually if needed.
+    // ── Step 2: Notify the internal team ────────────────────────────────────────
     try {
-      await sendRentalEnquiryNotification({ formData, product, draftOrder });
+      await sendRentalEnquiryNotification({ formData, product });
       console.log('[rental-enquiry] ✅ Team notification sent');
     } catch (emailErr) {
       console.error('[rental-enquiry] ❌ Team notification FAILED:', emailErr.message);
+      return res.status(500).json({ success: false, message: 'Failed to send enquiry notification.' });
     }
 
     // Step 3: Respond
-    return res.json({
-      success:          true,
-      draft_order_id:   draftOrder?.id   || null,
-      draft_order_name: draftOrder?.name || null,
-    });
+    return res.json({ success: true });
   } catch (err) {
     console.error('[rental-enquiry] Unhandled error:', err);
     return res.status(500).json({ success: false, message: 'Internal server error.' });
