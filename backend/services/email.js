@@ -282,7 +282,7 @@ async function sendInternalInvoiceNotification({ formType, formData, draftOrder,
   const transporter  = createTransporter();
   const store        = storeMeta();
   const billingType  = formType === 'ndis' ? 'NDIS' : 'Aged Care';
-  const internalTo   = 'contact@agedcareandmedical.com.au';
+  const internalTo   = 'accounts@agedcareandmedical.com.au';
   const customerName = formData.submitter_full_name || formData.participant_full_name || 'Customer';
 
   const mailOptions = {
